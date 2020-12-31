@@ -15,6 +15,12 @@ void print(const std::vector<int>& v)
 	std::cout << std::endl;
 }
 
+/**
+ *	The expression class represents a set of 6 board numbers, 
+ *	along with 5 operators. The Expression class is responsible
+ *	for generating all permutations of these 11 tokens, and 
+ * 	for checking and evaluating the RPN.
+ */
 
 Expression::Expression(std::vector<int> numbers, std::string operators) {
 	this->numbers = numbers;
@@ -137,6 +143,12 @@ void NumberSet::generate_symbols() {
 }
 
 std::vector<int> NumberSet::global_counts;
+
+/**
+ *	The NumberSet class represents a set of board numbers, without operators.
+ *	There are 13243 different NumberSet instances generated, and each of them
+ *	generates 56 Expression instances where the choices of operators are added.
+ */
 
 NumberSet::NumberSet(std::vector<int> numbers) {
 	this->numbers = numbers;

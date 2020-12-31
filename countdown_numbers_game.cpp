@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <cstdlib>
 
-// #define COMPILE_MPI 1
 #ifdef COMPILE_MPI
 #include "countdown_mpi.h"
 #endif
