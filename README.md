@@ -48,16 +48,16 @@ We parse it from left to right, adding numbers to the stack as we go along. Afte
 
 	Token	Stack	Output
 	2		[2]		[2]
-	1		[2,1]	[2]
+	1		[2,1]		[2]
 	+		[3]		[2,3]
-	2		[3,2]	[2,3]
-	1		[3,2,1]	[2,3]
-	+		[3,3]	[2,3]
+	2		[3,2]		[2,3]
+	1		[3,2,1]		[2,3]
+	+		[3,3]		[2,3]
 	*		[9]		[2,3,9]
-	3		[9,3]	[2,3,9]
-	*		[27]	[2,3,9,27]
-	3		[27,3]	[2,3,9,27]
-	*		[81]	[2,3,9,27,81]
+	3		[9,3]		[2,3,9]
+	*		[27]		[2,3,9,27]
+	3		[27,3]		[2,3,9,27]
+	*		[81]		[2,3,9,27,81]
 
 From this single expression, we get 5 reachable target numbers (although none of them are 3-digit). All 5 of these results will be recorded in the output file.
 
