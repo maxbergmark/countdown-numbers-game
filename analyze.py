@@ -53,6 +53,9 @@ class Analyzer:
 		x = np.linspace(0, 100, 1000)
 		d = np.percentile(self.numbers_per_board, x)
 		plt.plot(x, d)
+		plt.xlabel("Percentile")
+		plt.ylabel("Reachable target numbers")
+		plt.title("Percentiles for number of reachable target numbers per board")
 		plt.show()
 
 	@pretty_print
@@ -171,7 +174,7 @@ class Analyzer:
 		plt.show()
 
 	def run_analysis(self):
-		# self.plot_percentiles()
+		self.plot_percentiles()
 		self.easiest_numbers()
 		self.hardest_numbers()
 		self.easiest_boards()

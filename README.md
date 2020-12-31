@@ -2,7 +2,7 @@
 
 Inspired by [this youtube video](https://www.youtube.com/watch?v=cVMhkqPP2YI&ab_channel=Computerphile), this repo contains code to bruteforce the [Countdown Numbers Game](https://en.wikipedia.org/wiki/Countdown_(game_show)#Numbers_round).
 
-The code for brute forcing solutions is written in C++ with support for both OpenMP and MPI. The code for analyzing the results is written in Python3.
+The code for brute forcing solutions is written in C++ with support for both OpenMP and MPI. The code for analyzing the results is written in Python 3.
 
 ## Compiling C++
 
@@ -87,6 +87,13 @@ The exact count in the output file should be taken with a grain of salt. As an e
 	((2 + 1) x (2 + 1)) x (3 x 3) = 81    (RPN: 21+21+*33**)
 
 However, since their RPN representation is different, they count as two different solutions. Thus, the real benefit out the output file is checking whether the number of ways to reach a specific target is zero or non-zero. 
+
+## Running analysis
+
+The analysis script is written in Python 3, and uses the packages in the `requirements.txt` file. To install everything and run, use:
+
+	python -m pip install -r requirements.txt
+	python analyze.py
 
 ## Benchmarks
 
