@@ -79,6 +79,16 @@ The first 6 numbers are `1,1,2,2,3,3`, representing the board numbers. We know t
 
 we see the number `120` at the end of the non-zero numbers. This number is in position 81 (zero-indexed), and describes the number of RPN permutations that resulted in the number 81. 
 
+### Checksums
+
+Both the MPI version and the OpenMP version have identical file checksums:
+
+	$ md5sum output.csv
+	2c805d07a13038ffea535c84d33019b3  output.csv
+
+	$ sha256sum output.csv
+	cb792af51d27aff87aa14c63389c40bd07ad15bc65455d6d9d22e761ed1bc176  output.csv
+
 ### Caution
 
 The exact count in the output file should be taken with a grain of salt. As an example, the following calculations might appear to be identical:
@@ -87,6 +97,18 @@ The exact count in the output file should be taken with a grain of salt. As an e
 	((2 + 1) x (2 + 1)) x (3 x 3) = 81    (RPN: 21+21+*33**)
 
 However, since their RPN representation is different, they count as two different solutions. Thus, the real benefit out the output file is checking whether the number of ways to reach a specific target is zero or non-zero. 
+
+## Performance
+
+One important factor for improving performance comes from using `std::next_permutation`. Since each RPN expression consists of 11 tokens, we should expect there to be `11! = 39916800` ways to order these tokens. But this is only correct if all tokens are unique. When accounting for RPN expressions with duplicate tokens, the total number of RPN evaluations drops by a significant amount.
+
+Without considering duplicate tokens, the total number of RPN evaluations is `13243 * 56 * 11! = 2.960262e+13`. If we account for duplicates, we instead end up evaluating `2.498643e+12` RPN expressions, a work reduction of 91.56%.
+
+Using the single core time from the Amazon EC2 c5a.16xlarge benchmark below (1071m17.573s = 64277.573s), we can calculate that each RPN evaluation took `64277.573s / 2.498643e+12 = 25.725ns`. With a clock frequency of 3.5GHz, this is equivalent to about 87.465 clock cycles per RPN evaluation.
+
+The reason that it's possible to evaluate a RPN expression using only 87.465 clock cycles on average is that most RPN expression are invalid when using a random permutation of 6 numbers and 5 operators. Actually, only `10!` of the possible `11!` permutations (ignoring duplicates) yield valid RPN expressions. 
+
+No exact calculation on the exact number of discarded RPN expressions exists for now, but we can estimate that this discovery provides about 10x speedup if we are able to quickly discard invalid RPN expressions.
 
 ## Running analysis
 
@@ -110,7 +132,31 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ### Dell XPS 9560 (4 cores, 8 threads) using MPI
 
-	// TODO
+	$ mpirun -np 4 time ./countdown_mpi.out 2 > output_mpi.csv
+	....
+	sum: 119547486361
+
+	25732.60 user
+	22.99 system 
+	3:42:40 elapsed 
+	192% CPU
+
+	25922.14 user
+	17.89 system 
+	3:42:40 elapsed
+	194% CPU
+
+	25000.80 user
+	43.57 system 
+	3:42:40 elapsed 
+	187% CPU
+
+	25480.52 user
+	37.87 system
+	3:43:00 elapsed
+	190% CPU
+
+By combining the results of each process, we get a total `user` time of `102136.06s = 1702m16.06s`, which is almost identical to the pure OpenMP result.
 
 ### Amazon EC2 c5a.16xlarge (32 cores, 64 threads)
 
@@ -144,6 +190,6 @@ An attempt to rewrite the algorithm using OpenCL was made, but it proved to be s
 
 ### MPI dynamic batching
 
-A big problem with the MPI version of the algorithm is that while the work is split into equal parts in terms of size, it is difficult to predict the amount of work required for each set of numbers. As such, the amount of actual work per process can vary by a substantial amount, which decreases average CPU utilization for the entire duration of the runtime. 
+A big problem with the MPI version of the algorithm is that while the work is split into equal parts in terms of size, it is difficult to predict the amount of work required for each set of numbers. As such, the amount of actual work per process could vary by a substantial amount, which decreases average CPU utilization for the entire duration of the runtime. 
 
 To solve this problem, the MPI implementation could use dynamic batching to divide the work among the nodes in the cluster. However, this is likely to interfere with the general structure of the non-MPI code, which is why it has been left out of scope for now. 

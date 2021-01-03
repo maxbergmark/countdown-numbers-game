@@ -3,6 +3,15 @@ import numpy as np
 from itertools import combinations
 from time import perf_counter as clock
 
+# This script is functional but incomplete. Do not use it unless you know
+# what you're doing, and have looked at the code. 
+
+def fac(n):
+	p = 1
+	for i in range(1, n+1):
+		p *= i
+	return p
+
 class CountdownGame:
 
 	def __init__(self):
@@ -71,6 +80,21 @@ class CountdownGame:
 				# print(n, o)
 		self.data_np = np.array(data, dtype = np.int32)
 
+	def calculate_permutations(self):
+		mapped_operators = list(map(self.map_operators, self.operators))
+		self.numbers = self.get_numbers()
+		total_perms = 0
+		for n in self.numbers:
+			for o in mapped_operators:
+				data_set = sorted(o) + list(n)
+				token_set = set(data_set)
+				perms = fac(len(data_set))
+				for token in token_set:
+					perms //= fac(data_set.count(token))
+				# print(len(data_set))
+				total_perms += perms
+		print(total_perms, f"{total_perms:e}")
+
 	def run_kernel(self):
 		print("running kernel")
 		print(self.data_np.shape)
@@ -94,6 +118,7 @@ class CountdownGame:
 		# np.savetxt("output_py.csv", self.result_np, delimiter=",")
 
 game = CountdownGame()
+# game.calculate_permutations()
 game.setup_opencl()
 game.make_kernel()
 game.run_kernel()
