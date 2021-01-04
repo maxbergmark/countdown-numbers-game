@@ -3,6 +3,7 @@ import numpy as np
 from itertools import combinations
 from time import perf_counter as clock
 from collections import defaultdict
+import sys
 
 NUM_NUMBERS = 6
 NUM_SYMBOLS = NUM_NUMBERS - 1
@@ -29,7 +30,12 @@ class CountdownGame:
 
 	def __init__(self):
 		self._operators = None
-		self.filename = "countdown_kernel.cl"
+		self.kernel_filename = "countdown_kernel.cl"
+		if len(sys.argv) == 2:
+			self.output_filename = sys.argv[1]
+		else:
+			self.output_filename = "/tmp/output.csv"
+		print(f"Output filename: {self.output_filename}")
 		self.ctx = cl.create_some_context()
 		self.queue = cl.CommandQueue(self.ctx, 
 			properties=cl.command_queue_properties.PROFILING_ENABLE)
@@ -58,7 +64,7 @@ class CountdownGame:
 
 	@time_function
 	def make_kernel(self):
-		kernel = open(self.filename, "r").read()
+		kernel = open(self.kernel_filename, "r").read()
 		self.prg = cl.Program(self.ctx, kernel).build(["-cl-fast-relaxed-math"])
 
 
@@ -131,8 +137,8 @@ class CountdownGame:
 			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
 				f"({current_part:7.3f}%)", 
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
-			parsed_perms = self.run_single_data_set(num_perms, 
-				data, parsed_perms)
+			parsed_perms = self.run_single_data_set(
+				num_perms, data, parsed_perms)
 
 	def run_single_data_set(self, num_perms, data, parsed_perms):
 		t0 = clock()
@@ -181,7 +187,7 @@ class CountdownGame:
 			self.output_np[i,:NUM_NUMBERS] = k
 			self.output_np[i,NUM_NUMBERS:] = self.output_dict[k]
 
-		with open("/tmp/output_opencl.csv", "wb") as f:
+		with open(self.output_filename, "wb") as f:
 			np.savetxt(f, self.output_np, fmt='%d', delimiter=",")
 
 
