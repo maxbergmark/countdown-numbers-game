@@ -35,6 +35,10 @@ class CountdownGame:
 			properties=cl.command_queue_properties.PROFILING_ENABLE)
 		self.output_dict = defaultdict(
 			lambda: np.zeros((MAX_TARGET,), dtype=np.int32))
+		
+		self.generate_data_sets()
+		self.setup_opencl()
+		self.make_kernel()
 
 
 	@time_function
@@ -166,36 +170,21 @@ class CountdownGame:
 	@time_function
 	def verify_and_save(self):
 		total_permutations = 0
+		target_sum = 119547486361
 		for v in self.output_dict.values():
 			total_permutations += v.sum()
 
-		if total_permutations != 119547486361:
-			print(f"\nError exists: {total_permutations} != {119547486361}")
+		if total_permutations != target_sum:
+			print(f"\nError exists: {total_permutations} != {target_sum}")
 
-		# with open("/tmp/output_opencl.csv", "w") as f:
-			# pass
 		for i, k in enumerate(sorted(self.output_dict.keys())):
-			# if i % 100 == 0:
-				# print(i, k)
 			self.output_np[i,:NUM_NUMBERS] = k
 			self.output_np[i,NUM_NUMBERS:] = self.output_dict[k]
-			# counts_str = np.char.mod('%d', self.output_dict[k])
-			# line = (
-				# ",".join(map(str, k)) + ","
-				# ",".join(counts_str)
-				# ",".join(map(str, self.output_dict[k])) + "\n"
-			# )
-			# f.write(line)
+
 		with open("/tmp/output_opencl.csv", "wb") as f:
 			np.savetxt(f, self.output_np, fmt='%d', delimiter=",")
 
-		# np.savetxt("/tmp/output_opencl.csv", self.output_np, delimiter=",")
-
 
 game = CountdownGame()
-# game.calculate_permutations()
-game.generate_data_sets()
-game.setup_opencl()
-game.make_kernel()
 game.run_all_data_sets()
 game.verify_and_save()
