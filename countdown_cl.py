@@ -119,7 +119,7 @@ class CountdownGame:
 		parsed_perms = 0
 		self.total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
-			current_part = 100 * num_perms * data.shape[0] / total_perms
+			current_part = 100 * num_perms * data.shape[0] / self.total_perms
 			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
 				f"({current_part:7.3f}%)", 
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
