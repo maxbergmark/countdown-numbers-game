@@ -3,3 +3,4 @@ __pycache__/
 *.dat
 *.csv
 *.out
+*.pickle

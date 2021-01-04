@@ -10,9 +10,9 @@
 void print(const std::vector<int>& v)
 {
 	for (int e : v) {
-		std::cout << " " << e;
+		std::cerr << e << " ";
 	}
-	std::cout << std::endl;
+	std::cerr << std::endl;
 }
 
 /**
@@ -118,6 +118,9 @@ void Expression::evaluate(std::vector<int> &counts) {
 		if (check_rpn()) {
 			std::vector<int> vals = evaluate_rpn();
 			for (int val : vals) {
+				if (val == 28) {
+					print(tokens);
+				}
 				if (0 <= val && val < NUMBER_MAX_SIZE) {
 					counts[val]++;
 				}
@@ -178,10 +181,10 @@ bool predicate(const NumberSet& a, const NumberSet& b) {
 }
 
 std::vector<NumberSet> NumberSet::generate_numbers() {
-	int n = 24;
-	int r = 6;
 	std::set< std::vector<int> > combinations;
 
+	int n = 24;
+	int r = 6;
 	std::vector<bool> v(n);
 	std::fill(v.begin(), v.begin() + r, true);
 	do {
@@ -198,6 +201,7 @@ std::vector<NumberSet> NumberSet::generate_numbers() {
 		}
 		combinations.insert(nums);
 	} while (std::prev_permutation(v.begin(), v.end()));
+
 	std::vector< NumberSet > numbers(
 		combinations.begin(), combinations.end());
 	std::sort(numbers.begin(), numbers.end(), predicate);
