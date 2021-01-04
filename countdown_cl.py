@@ -5,8 +5,7 @@ from time import perf_counter as clock
 from collections import defaultdict
 import pickle
 
-# This script is functional but incomplete. Do not use it unless you know
-# what you're doing, and have looked at the code. 
+NUM_TOKENS = 11
 
 def fac(n):
 	p = 1
@@ -27,7 +26,6 @@ class CountdownGame:
 	def setup_opencl(self):
 		print("Creating buffers", end="\t", flush=True)
 		mf = cl.mem_flags
-		# self.generate_data_set()
 		self.dims_np = np.array(list(self.data_np.shape) + [0], dtype=np.int32)
 		self.result_np = np.zeros((self.dims_np[0], 1000), dtype=np.int32)
 		self.output_np = np.zeros((13243, 1006), dtype=np.int32)
@@ -47,7 +45,7 @@ class CountdownGame:
 		self.prg = cl.Program(self.ctx, kernel).build(["-cl-fast-relaxed-math"])
 		t1 = clock()
 		compilation_time = t1-t0
-		print(f"DONE ({compilation_time:.2f}s)")
+		print(f"DONE ({compilation_time:.2f}s)\n")
 
 	@property
 	def operators(self):
@@ -72,7 +70,7 @@ class CountdownGame:
 
 	def get_numbers(self):
 		big_numbers = [25, 50, 75, 100]
-		small_numbers = list(range(1, 11))*2
+		small_numbers = list(range(1, NUM_TOKENS))*2
 		choices = set(map(
 			lambda l: tuple(sorted(l)), 
 			combinations(big_numbers + small_numbers, 6)))
@@ -91,20 +89,17 @@ class CountdownGame:
 		mapped_operators = list(map(self.map_operators, self.operators))
 		self.numbers = self.get_numbers()
 		for n in self.numbers:
-			# if n != (1, 1, 2, 2, 3, 3):
-				# continue
 			for o in mapped_operators:
 				data_set = sorted(o) + list(n)
 				perms = self.calculate_perms(data_set)
 				data[perms].append(data_set)
-				# print(n, o)
+
 		self.np_data = defaultdict(np.ndarray)
 		for k, v in data.items():
 			self.np_data[k] = np.array(v)
-		self.max_data_size = max(map(len, data.values()))
 
-		# print(np_data.keys(), self.max_data_size)
-		self.data_np = np.zeros((self.max_data_size,11), dtype = np.int32)
+		self.max_data_size = max(map(len, data.values()))
+		self.data_np = np.zeros((self.max_data_size, NUM_TOKENS), dtype = np.int32)
 		print("DONE")
 
 	def calculate_permutations(self):
@@ -118,28 +113,28 @@ class CountdownGame:
 		total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
 			current_part = 100 * num_perms * data.shape[0] / total_perms
-			print(f"Running data set {i+1:2d}/{len(self.np_data):2d}:", 
-				data.shape, num_perms, f"({current_part:7.3f}%)")
+			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
+				f"({current_part:7.3f}%)", f"{data.shape[0]} items, {num_perms} permutations")
 
 			self.data_np[:data.shape[0],:] = data
 			self.dims_np[:2] = data.shape
 			self.dims_np[2] = num_perms
-			self.result_np[:] = 0
-			self.run_kernel()
+			# self.result_np[:] = 0
+			elapsed = self.run_kernel()
 			parsed_perms += num_perms * data.shape[0]
+			print(f"Elapsed: {elapsed:7.3f}s,", end="\t")
 			print(f"Done with {100 * parsed_perms / total_perms:6.2f}%\n")
-			# if i == 2:
-				# break
+
 		with open('test.pickle', 'wb') as f:
 			pickle.dump(dict(self.output_dict), f)
 
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
 		cl.enqueue_copy(self.queue, self.dims_g, self.dims_np)
-		cl.enqueue_copy(self.queue, self.result_g, self.result_np)
+		# cl.enqueue_copy(self.queue, self.result_g, self.result_np)
 
 		self.queue.finish()
-		event = self.prg.evaluate(self.queue, (self.dims_np[0]*1+0,), None, 
+		event = self.prg.evaluate(self.queue, (self.dims_np[0],), None, 
 			self.data_g, self.result_g, self.dims_g)
 		event.wait()
 		elapsed = 1e-9*(event.profile.end - event.profile.start)
@@ -149,14 +144,9 @@ class CountdownGame:
 		for i in range(self.dims_np[0]):
 			numbers = tuple(self.data_np[i,-6:])
 			counts = self.result_np[i,:]
-			# if numbers == (1, 1, 2, 2, 3, 3):
-				# print(counts)
 			self.output_dict[numbers] += counts
-			# print(numbers, counts[28])
-		# self.queue.finish()
-		# print(self.result_np)
-		print(f"Elapsed: {elapsed:7.3f}s, Maximum value: {self.result_np.max()}")
-		# np.savetxt("output_py.csv", self.result_np, delimiter=",")
+
+		return elapsed
 
 	def verify_and_save(self):
 		total_permutations = 0
