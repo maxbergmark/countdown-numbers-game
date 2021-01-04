@@ -26,6 +26,7 @@ class CountdownGame:
 		self.output_dict = defaultdict(
 			lambda: np.zeros((MAX_TARGET,), dtype=np.int32))
 
+
 	def setup_opencl(self):
 		print("Creating buffers", end="\t", flush=True)
 		mf = cl.mem_flags
@@ -50,6 +51,7 @@ class CountdownGame:
 		t1 = clock()
 		compilation_time = t1-t0
 		print(f"DONE ({compilation_time:.2f}s)\n")
+
 
 	@property
 	def operators(self):
@@ -87,7 +89,7 @@ class CountdownGame:
 			perms //= fac(data_set.count(token))
 		return perms
 
-	def generate_data_set(self):
+	def generate_data_sets(self):
 		print("Generating data set", end="\t", flush=True)
 		data = defaultdict(list)
 		mapped_operators = list(map(self.map_operators, self.operators))
@@ -115,24 +117,29 @@ class CountdownGame:
 
 	def run_all_data_sets(self):
 		parsed_perms = 0
-		total_perms = self.calculate_permutations()
+		self.total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
 			current_part = 100 * num_perms * data.shape[0] / total_perms
 			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
 				f"({current_part:7.3f}%)", 
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
-
-			self.data_np[:data.shape[0],:] = data
-			self.dims_np[:2] = data.shape
-			self.dims_np[2] = num_perms
-
-			elapsed = self.run_kernel()
-			parsed_perms += num_perms * data.shape[0]
-			print(f"Elapsed: {elapsed:7.3f}s,", end="\t")
-			print(f"Done with {100 * parsed_perms / total_perms:6.2f}%\n")
+			parsed_perms = self.run_single_data_set(num_perms, 
+				data, parsed_perms)
 
 		with open('test.pickle', 'wb') as f:
 			pickle.dump(dict(self.output_dict), f)
+
+	def run_single_data_set(self, num_perms, data, parsed_perms):
+		self.data_np[:data.shape[0],:] = data
+		self.dims_np[:2] = data.shape
+		self.dims_np[2] = num_perms
+
+		elapsed = self.run_kernel()
+		parsed_perms += num_perms * data.shape[0]
+		print(f"Elapsed: {elapsed:7.3f}s,", end="\t")
+		print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
+		return parsed_perms
+
 
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
@@ -153,6 +160,7 @@ class CountdownGame:
 
 		return elapsed
 
+
 	def verify_and_save(self):
 		total_permutations = 0
 		for v in self.output_dict.values():
@@ -171,9 +179,8 @@ class CountdownGame:
 
 game = CountdownGame()
 # game.calculate_permutations()
-game.generate_data_set()
+game.generate_data_sets()
 game.setup_opencl()
 game.make_kernel()
 game.run_all_data_sets()
-# game.run_kernel()
 game.verify_and_save()
