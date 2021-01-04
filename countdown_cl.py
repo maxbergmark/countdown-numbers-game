@@ -6,6 +6,8 @@ from collections import defaultdict
 import pickle
 
 NUM_TOKENS = 11
+MAX_TARGET = 1000
+NUM_NUMBERS = 6
 
 def fac(n):
 	p = 1
@@ -21,14 +23,16 @@ class CountdownGame:
 		self.ctx = cl.create_some_context()
 		self.queue = cl.CommandQueue(self.ctx, 
 			properties=cl.command_queue_properties.PROFILING_ENABLE)
-		self.output_dict = defaultdict(lambda: np.zeros((1000,), dtype=np.int32))
+		self.output_dict = defaultdict(
+			lambda: np.zeros((MAX_TARGET,), dtype=np.int32))
 
 	def setup_opencl(self):
 		print("Creating buffers", end="\t", flush=True)
 		mf = cl.mem_flags
 		self.dims_np = np.array(list(self.data_np.shape) + [0], dtype=np.int32)
-		self.result_np = np.zeros((self.dims_np[0], 1000), dtype=np.int32)
-		self.output_np = np.zeros((13243, 1006), dtype=np.int32)
+		self.result_np = np.zeros((self.dims_np[0], MAX_TARGET), dtype=np.int32)
+		self.output_np = np.zeros(
+			(len(self.numbers), NUM_NUMBERS + MAX_TARGET), dtype=np.int32)
 
 		self.data_g = cl.Buffer(self.ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.data_np)
@@ -73,7 +77,7 @@ class CountdownGame:
 		small_numbers = list(range(1, NUM_TOKENS))*2
 		choices = set(map(
 			lambda l: tuple(sorted(l)), 
-			combinations(big_numbers + small_numbers, 6)))
+			combinations(big_numbers + small_numbers, NUM_NUMBERS)))
 		return sorted(choices)
 
 	def calculate_perms(self, data_set):
@@ -99,7 +103,8 @@ class CountdownGame:
 			self.np_data[k] = np.array(v)
 
 		self.max_data_size = max(map(len, data.values()))
-		self.data_np = np.zeros((self.max_data_size, NUM_TOKENS), dtype = np.int32)
+		self.data_np = np.zeros(
+			(self.max_data_size, NUM_TOKENS), dtype = np.int32)
 		print("DONE")
 
 	def calculate_permutations(self):
@@ -114,12 +119,13 @@ class CountdownGame:
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
 			current_part = 100 * num_perms * data.shape[0] / total_perms
 			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
-				f"({current_part:7.3f}%)", f"{data.shape[0]} items, {num_perms} permutations")
+				f"({current_part:7.3f}%)", 
+				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
 
 			self.data_np[:data.shape[0],:] = data
 			self.dims_np[:2] = data.shape
 			self.dims_np[2] = num_perms
-			# self.result_np[:] = 0
+
 			elapsed = self.run_kernel()
 			parsed_perms += num_perms * data.shape[0]
 			print(f"Elapsed: {elapsed:7.3f}s,", end="\t")
@@ -131,7 +137,6 @@ class CountdownGame:
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
 		cl.enqueue_copy(self.queue, self.dims_g, self.dims_np)
-		# cl.enqueue_copy(self.queue, self.result_g, self.result_np)
 
 		self.queue.finish()
 		event = self.prg.evaluate(self.queue, (self.dims_np[0],), None, 
@@ -142,7 +147,7 @@ class CountdownGame:
 		self.queue.finish()
 
 		for i in range(self.dims_np[0]):
-			numbers = tuple(self.data_np[i,-6:])
+			numbers = tuple(self.data_np[i,-NUM_NUMBERS:])
 			counts = self.result_np[i,:]
 			self.output_dict[numbers] += counts
 
@@ -158,11 +163,10 @@ class CountdownGame:
 		else:
 			print("Error exists: {total_permutations} != {119547486361}")
 
-		with open("output_opencl.csv", "w") as f:
+		with open("/tmp/output_opencl.csv", "w") as f:
 			for k in sorted(self.output_dict.keys()):
 				f.write(",".join(map(str, k)) + ",")
 				f.write(",".join(map(str, self.output_dict[k])) + "\n")
-
 
 
 game = CountdownGame()
