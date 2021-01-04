@@ -3,17 +3,27 @@ import numpy as np
 from itertools import combinations
 from time import perf_counter as clock
 from collections import defaultdict
-import pickle
 
-NUM_TOKENS = 11
-MAX_TARGET = 1000
 NUM_NUMBERS = 6
+NUM_SYMBOLS = NUM_NUMBERS - 1
+NUM_TOKENS = NUM_NUMBERS + NUM_SYMBOLS
+MAX_TARGET = 1000
 
 def fac(n):
 	p = 1
 	for i in range(1, n+1):
 		p *= i
 	return p
+
+def time_function(f):
+	def wrapped(*args, **kw):
+		print(f"{f.__name__:20s}", end="\t", flush=True)
+		t0 = clock()
+		res = f(*args, **kw)
+		t1 = clock()
+		print(f"DONE ({t1-t0:.2f}s)")
+		return res
+	return wrapped
 
 class CountdownGame:
 
@@ -27,8 +37,8 @@ class CountdownGame:
 			lambda: np.zeros((MAX_TARGET,), dtype=np.int32))
 
 
+	@time_function
 	def setup_opencl(self):
-		print("Creating buffers", end="\t", flush=True)
 		mf = cl.mem_flags
 		self.dims_np = np.array(list(self.data_np.shape) + [0], dtype=np.int32)
 		self.result_np = np.zeros((self.dims_np[0], MAX_TARGET), dtype=np.int32)
@@ -41,16 +51,11 @@ class CountdownGame:
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.result_np)
 		self.dims_g = cl.Buffer(self.ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
-		print("DONE")
 
+	@time_function
 	def make_kernel(self):
-		print("Compiling kernel", end="\t", flush=True)
 		kernel = open(self.filename, "r").read()
-		t0 = clock()
 		self.prg = cl.Program(self.ctx, kernel).build(["-cl-fast-relaxed-math"])
-		t1 = clock()
-		compilation_time = t1-t0
-		print(f"DONE ({compilation_time:.2f}s)\n")
 
 
 	@property
@@ -89,8 +94,8 @@ class CountdownGame:
 			perms //= fac(data_set.count(token))
 		return perms
 
+	@time_function
 	def generate_data_sets(self):
-		print("Generating data set", end="\t", flush=True)
 		data = defaultdict(list)
 		mapped_operators = list(map(self.map_operators, self.operators))
 		self.numbers = self.get_numbers()
@@ -107,7 +112,6 @@ class CountdownGame:
 		self.max_data_size = max(map(len, data.values()))
 		self.data_np = np.zeros(
 			(self.max_data_size, NUM_TOKENS), dtype = np.int32)
-		print("DONE")
 
 	def calculate_permutations(self):
 		total_perms = 0
@@ -125,21 +129,22 @@ class CountdownGame:
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
 			parsed_perms = self.run_single_data_set(num_perms, 
 				data, parsed_perms)
-
-		with open('test.pickle', 'wb') as f:
-			pickle.dump(dict(self.output_dict), f)
+			# if i == 3:
+				# break
 
 	def run_single_data_set(self, num_perms, data, parsed_perms):
+		t0 = clock()
 		self.data_np[:data.shape[0],:] = data
 		self.dims_np[:2] = data.shape
 		self.dims_np[2] = num_perms
 
 		elapsed = self.run_kernel()
 		parsed_perms += num_perms * data.shape[0]
-		print(f"Elapsed: {elapsed:7.3f}s,", end="\t")
+		t1 = clock()
+		total_elapsed = t1 - t0
+		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
 		print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
 		return parsed_perms
-
 
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
@@ -160,21 +165,31 @@ class CountdownGame:
 
 		return elapsed
 
-
+	@time_function
 	def verify_and_save(self):
 		total_permutations = 0
 		for v in self.output_dict.values():
 			total_permutations += v.sum()
 
-		if total_permutations == 119547486361:
-			print("Data is accurate!")
-		else:
-			print("Error exists: {total_permutations} != {119547486361}")
+		if total_permutations != 119547486361:
+			print(f"\nError exists: {total_permutations} != {119547486361}")
 
-		with open("/tmp/output_opencl.csv", "w") as f:
-			for k in sorted(self.output_dict.keys()):
-				f.write(",".join(map(str, k)) + ",")
-				f.write(",".join(map(str, self.output_dict[k])) + "\n")
+		# with open("/tmp/output_opencl.csv", "w") as f:
+			# pass
+		for i, k in enumerate(sorted(self.output_dict.keys())):
+			# if i % 100 == 0:
+				# print(i, k)
+			self.output_np[i,:NUM_NUMBERS] = k
+			self.output_np[i,NUM_NUMBERS:] = self.output_dict[k]
+			# counts_str = np.char.mod('%d', self.output_dict[k])
+			# line = (
+				# ",".join(map(str, k)) + ","
+				# ",".join(counts_str)
+				# ",".join(map(str, self.output_dict[k])) + "\n"
+			# )
+			# f.write(line)
+
+		np.savetxt("/tmp/output_opencl.csv", self.output_np, delimiter=",")
 
 
 game = CountdownGame()
