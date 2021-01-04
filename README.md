@@ -209,10 +209,6 @@ In this benchmark, the calculation ran on a cluster of 4 NanoPi M4 SBCs using MP
 
 ## Future ideas
 
-### OpenCL
-
-An attempt to rewrite the algorithm using OpenCL was made, but it proved to be slower compared to running on the CPU. With the MPI support, there isn't much need to use OpenCL, since the only way it would be faster is if the calculation could be split over multiple GPUs, but then it could just as easily be run on multiple CPUs.
-
 ### MPI dynamic batching
 
 A big problem with the MPI version of the algorithm is that while the work is split into equal parts in terms of size, it is difficult to predict the amount of work required for each set of numbers. As such, the amount of actual work per process could vary by a substantial amount, which decreases average CPU utilization for the entire duration of the runtime. 
