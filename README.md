@@ -141,9 +141,10 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 	$ time python3 countdown_cl.py
 	...
-	real	4m34,425s
-	user	4m32,268s
-	sys	0m1,357s
+	real	4m10,709s
+	user	4m10,367s
+	sys	0m1,212s
+
 
 ### Dell XPS 9560 (4 cores, 8 threads)
 
