@@ -129,8 +129,6 @@ class CountdownGame:
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
 			parsed_perms = self.run_single_data_set(num_perms, 
 				data, parsed_perms)
-			# if i == 3:
-				# break
 
 	def run_single_data_set(self, num_perms, data, parsed_perms):
 		t0 = clock()
@@ -188,8 +186,10 @@ class CountdownGame:
 				# ",".join(map(str, self.output_dict[k])) + "\n"
 			# )
 			# f.write(line)
+		with open("/tmp/output_opencl.csv", "wb") as f:
+			np.savetxt(f, self.output_np, fmt='%d', delimiter=",")
 
-		np.savetxt("/tmp/output_opencl.csv", self.output_np, delimiter=",")
+		# np.savetxt("/tmp/output_opencl.csv", self.output_np, delimiter=",")
 
 
 game = CountdownGame()
