@@ -2,7 +2,15 @@
 
 Inspired by [this youtube video](https://www.youtube.com/watch?v=cVMhkqPP2YI&ab_channel=Computerphile), this repo contains code to bruteforce the [Countdown Numbers Game](https://en.wikipedia.org/wiki/Countdown_(game_show)#Numbers_round).
 
-The code for brute forcing solutions is written in C++ with support for both OpenMP and MPI. The code for analyzing the results is written in Python 3.
+The code for brute forcing solutions is written in C++ with support for both OpenMP and MPI. The code for analyzing the results is written in Python 3. An OpenCL implementation also exists for accelerated computing, which can be even faster than the C++ version.
+
+## OpenCL implementation
+
+After realizing that a major reason for speedup in the C++ version comes from not having to evaluate all `11!` permutations, the OpenCL version could also benefit from this fact. 
+
+Since we still want to use a SIMD approach, the data is batched based on the total number of permutations that exists for each specific RPN expression. Then, each data batch is ran through the OpenCL kernel, where each work item in a batch requires practically the exact same amount of work. 
+
+After a batch has been processed, we save the partial result in a dictionary. Once all batches are completed, the dictionary is transformed to the CSV output that we got from the C++ program. The MD5 checksum verifies that the CSV output is exactly correct.
 
 ## Compiling C++
 
@@ -20,6 +28,8 @@ To clean up and remove compiled executables, use
 
 ## Running
 
+### C++
+
 To run the executable without MPI support, use
 
     ./countdown.out <num_threads> > output.csv
@@ -33,6 +43,14 @@ In some cases, a hostfile can be needed. Depending on your MPI version, you migh
 	mpirun --bind-to none -f hostfile -np 4 ./countdown_mpi.out > output.csv
 
 In both of these cases, `stdout` should be directed to a file, while `stderr` is used to show the progress of the script while running. 
+
+### OpenCL
+
+The OpenCL version is implemented using PyOpenCL. To run it, use:
+
+	python countdown_cl.py
+
+In this case, we don't redirect output to a file, since the script handles the file output on its own. 
 
 ## Partial results
 
@@ -119,8 +137,15 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ## Benchmarks
 
-### Dell XPS 9560 (4 cores, 8 threads)
+### OpenCL, Intel 5820K + GTX 1080Ti (3584 CUDA cores)
 
+	$ time python3 countdown_cl.py
+	...
+	real	4m34,425s
+	user	4m32,268s
+	sys	0m1,357s
+
+### Dell XPS 9560 (4 cores, 8 threads)
 
 	$ time ./countdown.out 8 > output_test.csv
 	...
