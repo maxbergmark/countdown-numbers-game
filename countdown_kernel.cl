@@ -1,10 +1,11 @@
 #define NUM_TOKENS 11
 #define MAX_TARGET 1000
 
-#define NUM_EXTRA_VALUES 3
+#define NUM_EXTRA_VALUES 4
 #define SUBTRACTION_FAIL_INDEX 1000
 #define DIVISION_FAIL_INDEX 1001
 #define PERMUTATION_FAIL_INDEX 1002
+#define PERMUTATION_SUCCESS_INDEX 1003
 
 void swap(int* a, int* b) {
 	int tmp = *a;
@@ -155,8 +156,10 @@ kernel void evaluate(__global int *data_g, __global int *result,
 				int in_range = 0 <= val & val < MAX_TARGET;
 				local_result[val * in_range] += in_range;
 			}
+			local_result[PERMUTATION_SUCCESS_INDEX]++;
+		} else {
+			local_result[PERMUTATION_FAIL_INDEX]++;
 		}
-		local_result[PERMUTATION_FAIL_INDEX] += check;
 		next_permutation(first, last);
 	}
 

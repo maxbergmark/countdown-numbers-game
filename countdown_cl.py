@@ -10,10 +10,11 @@ NUM_SYMBOLS = NUM_NUMBERS - 1
 NUM_TOKENS = NUM_NUMBERS + NUM_SYMBOLS
 MAX_TARGET = 1000
 
-NUM_EXTRA_VALUES = 3
+NUM_EXTRA_VALUES = 4
 SUBTRACTION_FAIL_INDEX = 1000
 DIVISION_FAIL_INDEX = 1001
 PERMUTATION_FAIL_INDEX = 1002
+PERMUTATION_SUCCESS_INDEX = 1003
 
 def fac(n):
 	p = 1
@@ -149,11 +150,14 @@ class CountdownGame:
 				num_perms, data, parsed_perms)
 
 	def update_extra_stats(self, i):
-		keys = ("division_fails", "subtraction_fails", "permutation_fails")
-		indices = (DIVISION_FAIL_INDEX, 
-			SUBTRACTION_FAIL_INDEX, PERMUTATION_FAIL_INDEX)
+		keys = ("division_fails", "subtraction_fails", 
+			"permutation_fails", "permutation_successes")
+		indices = (DIVISION_FAIL_INDEX, SUBTRACTION_FAIL_INDEX, 
+			PERMUTATION_FAIL_INDEX, PERMUTATION_SUCCESS_INDEX)
+
 		for key, index in zip(keys, indices):
 			self.extra_stats[key] += self.result_np[i,index]
+
 		total_evaluations = self.result_np[i,:MAX_TARGET].sum()
 		self.extra_stats["total_evaluations"] += total_evaluations
 
