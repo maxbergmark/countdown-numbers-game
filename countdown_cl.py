@@ -154,6 +154,7 @@ class CountdownGame:
 			SUBTRACTION_FAIL_INDEX, PERMUTATION_FAIL_INDEX)
 		for key, index in zip(keys, indices):
 			self.extra_stats[key] += self.result_np[i,index]
+		self.extra_stats["total_evaluations"] += self.result_np[i,:MAX_TARGET]
 
 	def run_single_data_set(self, num_perms, data, parsed_perms):
 		t0 = clock()
