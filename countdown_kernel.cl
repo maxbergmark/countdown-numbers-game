@@ -1,6 +1,11 @@
 #define NUM_TOKENS 11
 #define MAX_TARGET 1000
 
+#define NUM_EXTRA_VALUES 3
+#define SUBTRACTION_FAIL_INDEX 1000
+#define DIVISION_FAIL_INDEX 1001
+#define PERMUTATION_FAIL_INDEX 1002
+
 void swap(int* a, int* b) {
 	int tmp = *a;
 	*a = *b;
@@ -49,7 +54,8 @@ void print(int nums[], int n) {
 	printf("\n");
 }
 
-void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n) {
+void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n, 
+	int local_result[MAX_TARGET + NUM_EXTRA_VALUES]) {
 
 	int stack[10];
 	int stack_i = 0;
@@ -71,6 +77,7 @@ void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n) {
 				case -2: // subtraction
 					if (b > a) {
 						*res_n = res_i;
+						local_result[SUBTRACTION_FAIL_INDEX]++;
 						return;
 					}
 					val = a - b;
@@ -81,6 +88,7 @@ void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n) {
 				case -4: // division
 					if (b == 0 || a % b != 0) {
 						*res_n = res_i;
+						local_result[DIVISION_FAIL_INDEX]++;
 						return;
 					}
 					val = a / b;
@@ -133,25 +141,27 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	int rpn_res[10];
 	int rpn_n;
 	
-	int local_result[MAX_TARGET];
-	for (int i = 0; i < MAX_TARGET; i++) {
+	int local_result[MAX_TARGET + NUM_EXTRA_VALUES];
+	for (int i = 0; i < MAX_TARGET + NUM_EXTRA_VALUES; i++) {
 		local_result[i] = 0;
 	}
 
 	for (int i = 0; i < limit; i++) {
 		if (check_rpn(local_data, NUM_TOKENS)) {
-			evaluate_rpn(local_data, rpn_res, NUM_TOKENS, &rpn_n);
+			evaluate_rpn(local_data, rpn_res, NUM_TOKENS, &rpn_n, local_result);
 			for (int j = 0; j < rpn_n; j++) {
 				int val = rpn_res[j];
 				int in_range = 0 <= val & val < MAX_TARGET;
 				local_result[val * in_range] += in_range;
 			}
+		} else {
+			local_result[PERMUTATION_FAIL_INDEX]++;
 		}
 		next_permutation(first, last);
 	}
 
-	for (int i = 0; i < MAX_TARGET; i++) {
-		result[MAX_TARGET * tid + i] = local_result[i];
+	for (int i = 0; i < MAX_TARGET + NUM_EXTRA_VALUES; i++) {
+		result[(MAX_TARGET + NUM_EXTRA_VALUES) * tid + i] = local_result[i];
 	}
 
 }

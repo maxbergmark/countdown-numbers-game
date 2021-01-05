@@ -10,6 +10,11 @@ NUM_SYMBOLS = NUM_NUMBERS - 1
 NUM_TOKENS = NUM_NUMBERS + NUM_SYMBOLS
 MAX_TARGET = 1000
 
+NUM_EXTRA_VALUES = 3
+SUBTRACTION_FAIL_INDEX = 1000
+DIVISION_FAIL_INDEX = 1001
+PERMUTATION_FAIL_INDEX = 1002
+
 def fac(n):
 	p = 1
 	for i in range(1, n+1):
@@ -41,6 +46,7 @@ class CountdownGame:
 			properties=cl.command_queue_properties.PROFILING_ENABLE)
 		self.output_dict = defaultdict(
 			lambda: np.zeros((MAX_TARGET,), dtype=np.int32))
+		self.extra_stats = defaultdict(int)
 		
 		self.generate_data_sets()
 		self.setup_opencl()
@@ -51,7 +57,8 @@ class CountdownGame:
 	def setup_opencl(self):
 		mf = cl.mem_flags
 		self.dims_np = np.array(list(self.data_np.shape) + [0], dtype=np.int32)
-		self.result_np = np.zeros((self.dims_np[0], MAX_TARGET), dtype=np.int32)
+		self.result_np = np.zeros(
+			(self.dims_np[0], MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
 		self.output_np = np.zeros(
 			(len(self.numbers), NUM_NUMBERS + MAX_TARGET), dtype=np.int32)
 
@@ -131,6 +138,7 @@ class CountdownGame:
 
 	def run_all_data_sets(self):
 		parsed_perms = 0
+		print()
 		self.total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
 			current_part = 100 * num_perms * data.shape[0] / self.total_perms
@@ -139,6 +147,13 @@ class CountdownGame:
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
 			parsed_perms = self.run_single_data_set(
 				num_perms, data, parsed_perms)
+
+	def update_extra_stats(self, i):
+		keys = ("division_fails", "subtraction_fails", "permutation_fails")
+		indices = (DIVISION_FAIL_INDEX, 
+			SUBTRACTION_FAIL_INDEX, PERMUTATION_FAIL_INDEX)
+		for key, index in zip(keys, indices):
+			self.extra_stats[key] += self.result_np[i,index]
 
 	def run_single_data_set(self, num_perms, data, parsed_perms):
 		t0 = clock()
@@ -168,17 +183,23 @@ class CountdownGame:
 
 		for i in range(self.dims_np[0]):
 			numbers = tuple(self.data_np[i,-NUM_NUMBERS:])
-			counts = self.result_np[i,:]
+			counts = self.result_np[i,:MAX_TARGET]
+			self.update_extra_stats(i)
 			self.output_dict[numbers] += counts
 
 		return elapsed
 
-	@time_function
+	def print_extra_stats(self):
+		for key, value in self.extra_stats.items():
+			print(f"{key + ':':18s} {value:14d} ({value:.3e})")
+
 	def verify_and_save(self):
 		total_permutations = 0
 		target_sum = 119547486361
 		for v in self.output_dict.values():
 			total_permutations += v.sum()
+
+		self.print_extra_stats()
 
 		if total_permutations != target_sum:
 			print(f"\nError exists: {total_permutations} != {target_sum}")

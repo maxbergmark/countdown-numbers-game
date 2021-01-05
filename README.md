@@ -48,9 +48,9 @@ In both of these cases, `stdout` should be directed to a file, while `stderr` is
 
 The OpenCL version is implemented using PyOpenCL. To run it, use:
 
-	python countdown_cl.py
+	python countdown_cl.py <output_filename>
 
-In this case, we don't redirect output to a file, since the script handles the file output on its own. 
+In this case, we don't redirect output to a file, since the script handles the file output on its own. Instead we supply the filename as an optional command line argument. 
 
 ## Partial results
 
@@ -139,7 +139,7 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ### OpenCL, Intel 5820K + GTX 1080Ti (3584 CUDA cores)
 
-	$ time python3 countdown_cl.py
+	$ time python3 countdown_cl.py output.csv
 	...
 	real	4m10,709s
 	user	4m10,367s
@@ -148,7 +148,7 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ### Dell XPS 9560 (4 cores, 8 threads)
 
-	$ time ./countdown.out 8 > output_test.csv
+	$ time ./countdown.out 8 > output.csv
 	...
 	sum: 119547486361
 
@@ -158,7 +158,7 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ### Dell XPS 9560 (4 cores, 8 threads) using MPI
 
-	$ mpirun -np 4 time ./countdown_mpi.out 2 > output_mpi.csv
+	$ mpirun -np 4 time ./countdown_mpi.out 2 > output.csv
 	....
 	sum: 119547486361
 
