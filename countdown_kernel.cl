@@ -147,16 +147,16 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	}
 
 	for (int i = 0; i < limit; i++) {
-		if (check_rpn(local_data, NUM_TOKENS)) {
+		bool check = check_rpn(local_data, NUM_TOKENS);
+		if (check) {
 			evaluate_rpn(local_data, rpn_res, NUM_TOKENS, &rpn_n, local_result);
 			for (int j = 0; j < rpn_n; j++) {
 				int val = rpn_res[j];
 				int in_range = 0 <= val & val < MAX_TARGET;
 				local_result[val * in_range] += in_range;
 			}
-		} else {
-			local_result[PERMUTATION_FAIL_INDEX]++;
 		}
+		local_result[PERMUTATION_FAIL_INDEX] += check;
 		next_permutation(first, last);
 	}
 
