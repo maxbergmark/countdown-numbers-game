@@ -197,7 +197,7 @@ class CountdownGame:
 
 	def print_extra_stats(self):
 		for key, value in self.extra_stats.items():
-			print(f"{key + ':':18s} {value:14d} ({value:.3e})")
+			print(f"{key + ':':24s} {value:14d} ({value:.3e})")
 
 	def verify_and_save(self):
 		total_permutations = 0
