@@ -139,6 +139,7 @@ class CountdownGame:
 
 	def run_all_data_sets(self):
 		parsed_perms = 0
+		self.total_kernel_time = 0
 		print()
 		self.total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
@@ -146,8 +147,9 @@ class CountdownGame:
 			print(f"Running batch {i+1:2d}/{len(self.np_data):2d}:", 
 				f"({current_part:7.3f}%)", 
 				f"{data.shape[0]:6d} items, {num_perms:8d} permutations")
-			parsed_perms = self.run_single_data_set(
+			elapsed, parsed_perms = self.run_single_data_set(
 				num_perms, data, parsed_perms)
+			self.total_kernel_time += elapsed
 
 	def update_extra_stats(self, i):
 		keys = ("division_fails", "subtraction_fails", 
@@ -173,7 +175,7 @@ class CountdownGame:
 		total_elapsed = t1 - t0
 		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
 		print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
-		return parsed_perms
+		return elapsed, parsed_perms
 
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
@@ -198,6 +200,7 @@ class CountdownGame:
 	def print_extra_stats(self):
 		for key, value in self.extra_stats.items():
 			print(f"{key + ':':24s} {value:14d} ({value:.3e})")
+		print(f"Total kernel time: {self.total_kernel_time:.2f}s")
 
 	def verify_and_save(self):
 		total_permutations = 0
