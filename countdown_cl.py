@@ -200,8 +200,10 @@ class CountdownGame:
 
 	def calculate_permutations(self):
 		total_perms = 0
-		for k, v in self.np_data.items():
-			total_perms += k * v.shape[0]
+		for data_set in self.data_sets:
+			total_perms += data_set.num_perms
+		# for k, v in self.np_data.items():
+			# total_perms += k * v.shape[0]
 		return total_perms
 
 	def run_all_data_sets_old(self):
@@ -219,7 +221,9 @@ class CountdownGame:
 			break
 
 	def run_all_data_sets(self):
+		self.total_perms = self.calculate_permutations()
 		for data_set in self.data_sets:
+			data_set.total_perms = self.total_perms
 			data_set.run(self.prg, self.queue, self.output_dict)
 			break
 
