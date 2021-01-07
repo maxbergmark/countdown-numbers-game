@@ -143,19 +143,15 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 
 ### OpenCL, Intel 5820K + GTX 1080Ti (3584 CUDA cores)
 
-	$ time python3 countdown_cl.py output.csv
-	...
-	real	4m10,709s
-	user	4m10,367s
-	sys	0m1,212s
-
-When we record additional stats, the time is slightly slower:
+With the OpenCL version, we record additional stats, the time is slightly slower than optimal:
 
 	$ time python3 countdown_cl.py output.csv
 	...
-	real	6m32,265s
-	user	6m31,368s
-	sys	0m1,396s
+	real	6m4,459s
+	user	6m2,912s
+	sys	0m2,053s
+
+With a bare bone solution, the runtime would be around 4 minutes. 
 
 ### Dell XPS 9560 (4 cores, 8 threads)
 
@@ -196,7 +192,6 @@ When we record additional stats, the time is slightly slower:
 By combining the results of each process, we get a total `user` time of `102136.06s = 1702m16.06s`, which is almost identical to the pure OpenMP result.
 
 ### Amazon EC2 c5a.16xlarge (32 cores, 64 threads)
-
 
 	$ time ./countdown.out 64 > output.csv
 	...
