@@ -61,6 +61,7 @@ class DataSet:
 		self.dims_g = cl.Buffer(ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
 
+
 	def start_kernel(self, prg, queue):
 		current_part = 100 * self.total_dataset_perms / self.total_perms
 		print(f"Running batch {self.idx+1:2d}/{DataSet.num_batches:2d}:", 
@@ -92,7 +93,6 @@ class DataSet:
 			output_dict[numbers] += counts
 			self.update_extra_stats(i, extra_stats)
 
-
 	def update_extra_stats(self, i, extra_stats):
 		keys = ("division_fails", "subtraction_fails", 
 			"permutation_fails", "permutation_successes")
@@ -104,6 +104,7 @@ class DataSet:
 
 		total_evaluations = self.result_np[i,:MAX_TARGET].sum()
 		extra_stats["total_evaluations"] += total_evaluations
+
 
 class CountdownGame:
 
@@ -188,16 +189,14 @@ class CountdownGame:
 		t0 = clock()
 		for data_set in self.data_sets:
 			data_set.start_kernel(self.prg, self.queue)
-			# break
 
 		for data_set in self.data_sets:
 			data_set.await_kernel(self.queue)
-			# break
 
 		for data_set in self.data_sets:
 			data_set.collect_data(self.output_dict, self.extra_stats)
 			self.total_kernel_time += data_set.kernel_time
-			# break
+
 		t1 = clock()
 		self.total_elapsed = t1 - t0
 
@@ -206,7 +205,7 @@ class CountdownGame:
 		for key, value in self.extra_stats.items():
 			print(f"{key + ':':24s} {value:14d} ({value:.3e})")
 		print()
-		print(f"Total execution time: {self.total_elapsed:.2f}s")
+		print(f"Total calculation time: {self.total_elapsed:.2f}s")
 		print(f"Total kernel time: {self.total_kernel_time:.2f}s")
 
 	def verify_and_save(self):
