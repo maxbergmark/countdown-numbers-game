@@ -74,12 +74,14 @@ class DataSet:
 
 	def await_kernel(self, queue):
 		self.event.wait()
-		self.kernel_time = 1e-9*(self.event.profile.end - self.event.profile.start)
+		t1_ns = self.event.profile.end
+		t0_ns = self.event.profile.start
+		self.kernel_time = 1e-9*(t1_ns - t0_ns)
 		self.copy_event = cl.enqueue_copy(queue, self.result_np, self.result_g)
 		DataSet.completed_perms += self.total_dataset_perms
 		progress = DataSet.completed_perms / DataSet.total_perms
 
-		print(f"Elapsed: {self.kernel_time:7.3f}s,", end="\t")
+		print(f"Kernel time: {self.kernel_time:7.3f}s,", end="\t")
 		print(f"Done with {100 * progress:6.2f}%")
 
 	def collect_data(self, output_dict, extra_stats):
@@ -200,8 +202,11 @@ class CountdownGame:
 		self.total_elapsed = t1 - t0
 
 	def print_extra_stats(self):
+		print()
 		for key, value in self.extra_stats.items():
 			print(f"{key + ':':24s} {value:14d} ({value:.3e})")
+		print()
+		print(f"Total execution time: {self.total_elapsed:.2f}s")
 		print(f"Total kernel time: {self.total_kernel_time:.2f}s")
 
 	def verify_and_save(self):
