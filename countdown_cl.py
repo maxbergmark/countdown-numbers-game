@@ -80,7 +80,7 @@ class DataSet:
 		progress = DataSet.completed_perms / DataSet.total_perms
 
 		print(f"Elapsed: {self.kernel_time:7.3f}s,", end="\t")
-		print(f"Done with {100 * progress:6.2f}%\n")
+		print(f"Done with {100 * progress:6.2f}%")
 
 	def collect_data(self, output_dict, extra_stats):
 		self.copy_event.wait()
