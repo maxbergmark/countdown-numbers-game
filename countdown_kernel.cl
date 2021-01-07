@@ -105,17 +105,20 @@ void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n,
 	return;
 }
 
-bool check_rpn(int tokens[NUM_TOKENS], int n) {
+bool check_rpn(int tokens[NUM_TOKENS]) {
 	int s = 0;
-	for (int i = 0; i < n; i++) {
+	bool result = true;
+	for (int i = 0; i < NUM_TOKENS; i++) {
 		int token = tokens[i];
 		int valence = 2 * (token < 0);
 		s += 1 - valence;
-		if (s <= 0) {
-			return false;
-		}
+		result &= s <= 0;
+		// if (s <= 0) {
+			// return false;
+		// }
 	}
-	return true;
+	return result;
+	// return true;
 }
 
 int fac(int n) {
@@ -148,7 +151,7 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	}
 
 	for (int i = 0; i < limit; i++) {
-		bool check = check_rpn(local_data, NUM_TOKENS);
+		bool check = check_rpn(local_data);
 		if (check) {
 			evaluate_rpn(local_data, rpn_res, NUM_TOKENS, &rpn_n, local_result);
 			for (int j = 0; j < rpn_n; j++) {

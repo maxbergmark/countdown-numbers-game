@@ -122,11 +122,15 @@ One important factor for improving performance comes from using `std::next_permu
 
 Without considering duplicate tokens, the total number of RPN evaluations is `13243 * 56 * 11! = 2.960262e+13`. If we account for duplicates, we instead end up evaluating `2.498643e+12` RPN expressions, a work reduction of 91.56%.
 
-Using the single core time from the Amazon EC2 c5a.16xlarge benchmark below (1071m17.573s = 64277.573s), we can calculate that each RPN evaluation took `64277.573s / 2.498643e+12 = 25.725ns`. With a clock frequency of 3.5GHz, this is equivalent to about 87.465 clock cycles per RPN evaluation.
+Of these `2.498643e+12` permutations, most will end up being invalid RPN expressions. And among the valid RPN expressions, there are instances where division is attempted when the result wouldn't be an integer, and there are instances where subtraction is attempted that would yield a result below 0. By recording each such occurence, we get the following data:
 
-The reason that it's possible to evaluate a RPN expression using only 87.465 clock cycles on average is that most RPN expression are invalid when using a random permutation of 6 numbers and 5 operators. Actually, only `10!` of the possible `11!` permutations (ignoring duplicates) yield valid RPN expressions. 
+	Permutation fails:        2271493324800 (2.271e+12)
+	Permutation successes:     227149332480 (2.271e+11)
+	    Division fails:        121047625426 (1.210e+11)
+	    Subtraction fails:      73850835651 (7.385e+10)
+	    Total evaluations:     119547486361 (1.195e+11)
 
-No exact calculation on the exact number of discarded RPN expressions exists for now, but we can estimate that this discovery provides about 10x speedup if we are able to quickly discard invalid RPN expressions.
+About 90.9% of all permutations are invalid, and do not need to be evaluated. As such, it is of utmost importance that the `check_rpn` function is as fast as possible. When it comes to evaluating RPN expressions, we have a work reduction of about 99.23% compared to evaluating all permutations.
 
 ## Running analysis
 
@@ -145,6 +149,13 @@ The analysis script is written in Python 3, and uses the packages in the `requir
 	user	4m10,367s
 	sys	0m1,212s
 
+When we record additional stats, the time is slightly slower:
+
+	$ time python3 countdown_cl.py output.csv
+	...
+	real	6m32,265s
+	user	6m31,368s
+	sys	0m1,396s
 
 ### Dell XPS 9560 (4 cores, 8 threads)
 
