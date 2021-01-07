@@ -32,6 +32,7 @@ def time_function(f):
 class DataSet:
 
 	num_batches = 0
+	completed_perms = 0
 	total_perms = 0
 
 	def __init__(self, idx, num_perms, expressions, ctx):
@@ -40,7 +41,6 @@ class DataSet:
 		self.expressions_np = np.array(expressions, dtype=np.int32)
 		self.n = len(expressions)
 		self.total_dataset_perms = self.num_perms * self.n
-		self.extra_stats = defaultdict(int)
 
 		DataSet.total_perms += self.total_dataset_perms
 		DataSet.num_batches += 1
@@ -51,7 +51,7 @@ class DataSet:
 
 		self.dims_np = np.array(
 			[self.n, NUM_TOKENS, self.num_perms], dtype=np.int32)
-		self.result_np = np.zeros(
+		self.result_np = np.empty(
 			(self.n, MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
 
 		self.expressions_g = cl.Buffer(ctx, 
@@ -76,30 +76,32 @@ class DataSet:
 		self.event.wait()
 		self.kernel_time = 1e-9*(self.event.profile.end - self.event.profile.start)
 		self.copy_event = cl.enqueue_copy(queue, self.result_np, self.result_g)
+		DataSet.completed_perms += self.total_dataset_perms
+		progress = DataSet.completed_perms / DataSet.total_perms
 
 		print(f"Elapsed: {self.kernel_time:7.3f}s,", end="\t")
-		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
+		print(f"Done with {100 * progress:6.2f}%\n")
 
-	def collect_data(self, output_dict):
+	def collect_data(self, output_dict, extra_stats):
 		self.copy_event.wait()
 		for i in range(self.n):
 			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
 			counts = self.result_np[i,:MAX_TARGET]
 			output_dict[numbers] += counts
-			self.update_extra_stats(i)
+			self.update_extra_stats(i, extra_stats)
 
 
-	def update_extra_stats(self, i):
+	def update_extra_stats(self, i, extra_stats):
 		keys = ("division_fails", "subtraction_fails", 
 			"permutation_fails", "permutation_successes")
 		indices = (DIVISION_FAIL_INDEX, SUBTRACTION_FAIL_INDEX, 
 			PERMUTATION_FAIL_INDEX, PERMUTATION_SUCCESS_INDEX)
 
 		for key, index in zip(keys, indices):
-			self.extra_stats[key] += self.result_np[i,index]
+			extra_stats[key] += self.result_np[i,index]
 
 		total_evaluations = self.result_np[i,:MAX_TARGET].sum()
-		self.extra_stats["total_evaluations"] += total_evaluations
+		extra_stats["total_evaluations"] += total_evaluations
 
 class CountdownGame:
 
@@ -174,15 +176,9 @@ class CountdownGame:
 				perms = self.calculate_perms(expression)
 				data[perms].append(expression)
 
-		self.np_data = defaultdict(np.ndarray)
 		self.data_sets = []
 		for i, (num_perms, expressions) in enumerate(data.items()):
-			# self.np_data[num_perms] = np.array(expressions)
 			self.data_sets.append(DataSet(i, num_perms, expressions, self.ctx))
-
-		self.max_data_size = max(map(len, data.values()))
-		self.data_np = np.zeros(
-			(self.max_data_size, NUM_TOKENS), dtype = np.int32)
 
 
 	def run_all_data_sets(self):
@@ -197,9 +193,7 @@ class CountdownGame:
 			# break
 
 		for data_set in self.data_sets:
-			data_set.collect_data(self.output_dict)
-			for k, v in data_set.extra_stats.items():
-				self.extra_stats[k] += v
+			data_set.collect_data(self.output_dict, self.extra_stats)
 			self.total_kernel_time += data_set.kernel_time
 			# break
 		t1 = clock()
