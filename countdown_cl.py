@@ -63,6 +63,35 @@ class DataSet:
 
 		elapsed = self.start_kernel(prg, queue)
 
+	def run_kernel(self, prg, queue, output_dict):
+		t0 = clock()
+		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
+		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
+		# queue.finish()
+		self.event = prg.evaluate(queue, (self.n,), None, 
+			self.expressions_g, self.result_g, self.dims_g)
+		self.event.wait()
+		t1 = clock()
+		self.total_elapsed = t1 - t0
+		elapsed = 1e-9*(self.event.profile.end - self.event.profile.start)
+		cl.enqueue_copy(queue, self.result_np, self.result_g)
+		queue.finish()
+
+		# print(self.num_perms)
+		print(f"Elapsed: {elapsed:7.3f}s / {self.total_elapsed:7.3f}s,", end="\t")
+		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
+		for i in range(self.n):
+			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
+			counts = self.result_np[i,:MAX_TARGET]
+			# print(self.expressions_np[i,:])
+			# if counts.sum() > 0:
+				# print(counts)
+			# self.update_extra_stats(i)
+			output_dict[numbers] += counts
+
+		return elapsed
+
+
 	def start_kernel(self, prg, queue):
 		t0 = clock()
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
@@ -223,11 +252,13 @@ class CountdownGame:
 		self.total_perms = self.calculate_permutations()
 		for data_set in self.data_sets:
 			data_set.total_perms = self.total_perms
-			data_set.start_kernel(self.prg, self.queue)
-			# break
+			# data_set.start_kernel(self.prg, self.queue)
+			# data_set.await_kernel(self.queue, self.output_dict)
+			data_set.run_kernel(self.prg, self.queue, self.output_dict)
+			break
 
-		for data_set in self.data_sets:
-			data_set.await_kernel(self.queue, self.output_dict)
+		# for data_set in self.data_sets:
+			# data_set.await_kernel(self.queue, self.output_dict)
 			# break
 
 	def update_extra_stats(self, i):
