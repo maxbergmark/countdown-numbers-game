@@ -32,10 +32,76 @@ def time_function(f):
 		return res
 	return wrapped
 
+class DataSet:
+
+	def __init__(self, num_perms, expressions, ctx):
+		self.num_perms = num_perms
+		self.expressions_np = np.array(expressions, dtype=np.int32)
+		self.n = len(expressions)
+		self.total_perms = self.num_perms * self.n
+		self.setup_buffers(ctx)
+
+	# @time_function
+	def setup_buffers(self, ctx):
+		mf = cl.mem_flags
+		self.dims_np = np.array(
+			[self.n, NUM_TOKENS, self.num_perms], dtype=np.int32)
+		self.result_np = np.zeros(
+			(self.n, MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
+		# self.output_np = np.zeros(
+			# (len(self.numbers), NUM_NUMBERS + MAX_TARGET), dtype=np.int32)
+
+		self.expressions_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.expressions_np)
+		self.result_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.result_np)
+		self.dims_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
+
+	def run(self, prg, queue, output_dict):
+		t0 = clock()
+		# self.data_np[:data.shape[0],:] = data
+		# self.dims_np[:2] = data.shape
+		# self.dims_np[2] = num_perms
+
+		elapsed = self.run_kernel(prg, queue, output_dict)
+		# parsed_perms += num_perms * data.shape[0]
+		t1 = clock()
+		total_elapsed = t1 - t0
+		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
+		# print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
+		return elapsed, self.total_perms
+
+	def run_kernel(self, prg, queue, output_dict):
+		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
+		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
+
+		# queue.finish()
+		event = prg.evaluate(queue, (self.n,), None, 
+			self.expressions_g, self.result_g, self.dims_g)
+		event.wait()
+		elapsed = 1e-9*(event.profile.end - event.profile.start)
+		cl.enqueue_copy(queue, self.result_np, self.result_g)
+		queue.finish()
+
+		for i in range(self.n):
+			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
+			counts = self.result_np[i,:MAX_TARGET]
+			# print(self.expressions_np[i,:])
+			# if counts.sum() > 0:
+				# print(counts)
+			# self.update_extra_stats(i)
+			output_dict[numbers] += counts
+
+		return elapsed
+
+
+
 class CountdownGame:
 
 	def __init__(self):
 		self._operators = None
+		self.total_kernel_time = 0
 		self.kernel_filename = "countdown_kernel.cl"
 		if len(sys.argv) == 2:
 			self.output_filename = sys.argv[1]
@@ -124,8 +190,10 @@ class CountdownGame:
 				data[perms].append(data_set)
 
 		self.np_data = defaultdict(np.ndarray)
+		self.data_sets = []
 		for k, v in data.items():
 			self.np_data[k] = np.array(v)
+			self.data_sets.append(DataSet(k, v, self.ctx))
 
 		self.max_data_size = max(map(len, data.values()))
 		self.data_np = np.zeros(
@@ -137,9 +205,8 @@ class CountdownGame:
 			total_perms += k * v.shape[0]
 		return total_perms
 
-	def run_all_data_sets(self):
+	def run_all_data_sets_old(self):
 		parsed_perms = 0
-		self.total_kernel_time = 0
 		print()
 		self.total_perms = self.calculate_permutations()
 		for i, (num_perms, data) in enumerate(self.np_data.items()):
@@ -150,6 +217,12 @@ class CountdownGame:
 			elapsed, parsed_perms = self.run_single_data_set(
 				num_perms, data, parsed_perms)
 			self.total_kernel_time += elapsed
+			break
+
+	def run_all_data_sets(self):
+		for data_set in self.data_sets:
+			data_set.run(self.prg, self.queue, self.output_dict)
+			break
 
 	def update_extra_stats(self, i):
 		keys = ("division_fails", "subtraction_fails", 
@@ -163,6 +236,7 @@ class CountdownGame:
 		total_evaluations = self.result_np[i,:MAX_TARGET].sum()
 		self.extra_stats["total_evaluations"] += total_evaluations
 
+	"""
 	def run_single_data_set(self, num_perms, data, parsed_perms):
 		t0 = clock()
 		self.data_np[:data.shape[0],:] = data
@@ -176,7 +250,6 @@ class CountdownGame:
 		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
 		print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
 		return elapsed, parsed_perms
-
 	def run_kernel(self):
 		cl.enqueue_copy(self.queue, self.data_g, self.data_np)
 		cl.enqueue_copy(self.queue, self.dims_g, self.dims_np)
@@ -196,6 +269,7 @@ class CountdownGame:
 			self.output_dict[numbers] += counts
 
 		return elapsed
+	"""
 
 	def print_extra_stats(self):
 		for key, value in self.extra_stats.items():
