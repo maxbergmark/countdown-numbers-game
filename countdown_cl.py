@@ -34,12 +34,12 @@ def time_function(f):
 
 class DataSet:
 
-	def __init__(self, num_perms, expressions, total_perms, ctx):
+	def __init__(self, num_perms, expressions, ctx):
 		self.num_perms = num_perms
 		self.expressions_np = np.array(expressions, dtype=np.int32)
 		self.n = len(expressions)
 		self.num_perms = self.num_perms * self.n
-		self.total_perms = total_perms
+		self.total_perms = 0
 		self.setup_buffers(ctx)
 
 	# @time_function
@@ -60,22 +60,18 @@ class DataSet:
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
 
 	def run(self, prg, queue, output_dict):
-		t0 = clock()
 
-		elapsed = self.start_kernel(prg, queue, output_dict)
-		t1 = clock()
-		total_elapsed = t1 - t0
-		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
-		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
-		return elapsed, self.total_perms
+		elapsed = self.start_kernel(prg, queue)
 
 	def start_kernel(self, prg, queue):
+		t0 = clock()
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
-
 		# queue.finish()
 		self.event = prg.evaluate(queue, (self.n,), None, 
 			self.expressions_g, self.result_g, self.dims_g)
+		t1 = clock()
+		self.total_elapsed = t1 - t0
 
 	def await_kernel(self, queue, output_dict):
 		self.event.wait()
@@ -83,6 +79,9 @@ class DataSet:
 		cl.enqueue_copy(queue, self.result_np, self.result_g)
 		queue.finish()
 
+		# print(self.num_perms)
+		print(f"Elapsed: {elapsed:7.3f}s / {self.total_elapsed:7.3f}s,", end="\t")
+		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
 		for i in range(self.n):
 			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
 			counts = self.result_np[i,:MAX_TARGET]
@@ -192,7 +191,7 @@ class CountdownGame:
 		self.data_sets = []
 		for k, v in data.items():
 			self.np_data[k] = np.array(v)
-			self.data_sets.append(DataSet(k, v, self.total_perms, self.ctx))
+			self.data_sets.append(DataSet(k, v, self.ctx))
 
 		self.max_data_size = max(map(len, data.values()))
 		self.data_np = np.zeros(
@@ -224,8 +223,12 @@ class CountdownGame:
 		self.total_perms = self.calculate_permutations()
 		for data_set in self.data_sets:
 			data_set.total_perms = self.total_perms
-			data_set.run(self.prg, self.queue, self.output_dict)
-			break
+			data_set.start_kernel(self.prg, self.queue)
+			# break
+
+		for data_set in self.data_sets:
+			data_set.await_kernel(self.queue, self.output_dict)
+			# break
 
 	def update_extra_stats(self, i):
 		keys = ("division_fails", "subtraction_fails", 
