@@ -38,7 +38,7 @@ class DataSet:
 		self.num_perms = num_perms
 		self.expressions_np = np.array(expressions, dtype=np.int32)
 		self.n = len(expressions)
-		self.num_perms = self.num_perms * self.n
+		self.total_dataset_perms = self.num_perms * self.n
 		self.total_perms = 0
 		self.setup_buffers(ctx)
 
@@ -64,6 +64,11 @@ class DataSet:
 		elapsed = self.start_kernel(prg, queue)
 
 	def run_kernel(self, prg, queue, output_dict):
+		current_part = 100 * self.num_perms / self.total_perms
+		print(f"Running batch {0+1:2d}/{15:2d}:",
+			f"({current_part:7.3f}%)", 
+			f"{self.expressions_np.shape[0]:6d} items, {self.num_perms:8d} permutations")
+
 		t0 = clock()
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
@@ -252,13 +257,13 @@ class CountdownGame:
 		self.total_perms = self.calculate_permutations()
 		for data_set in self.data_sets:
 			data_set.total_perms = self.total_perms
-			# data_set.start_kernel(self.prg, self.queue)
+			data_set.start_kernel(self.prg, self.queue)
 			# data_set.await_kernel(self.queue, self.output_dict)
-			data_set.run_kernel(self.prg, self.queue, self.output_dict)
-			break
+			# data_set.run_kernel(self.prg, self.queue, self.output_dict)
+			# break
 
-		# for data_set in self.data_sets:
-			# data_set.await_kernel(self.queue, self.output_dict)
+		for data_set in self.data_sets:
+			data_set.await_kernel(self.queue, self.output_dict)
 			# break
 
 	def update_extra_stats(self, i):
