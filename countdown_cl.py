@@ -99,6 +99,7 @@ class DataSet:
 
 	def start_kernel(self, prg, queue):
 		t0 = clock()
+		print("Kernel started:", self.num_perms, self.n)
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
 		# queue.finish()
@@ -107,15 +108,19 @@ class DataSet:
 		t1 = clock()
 		self.total_elapsed = t1 - t0
 
-	def await_kernel(self, queue, output_dict):
+	def await_kernel(self, queue):
 		self.event.wait()
 		elapsed = 1e-9*(self.event.profile.end - self.event.profile.start)
-		cl.enqueue_copy(queue, self.result_np, self.result_g)
-		queue.finish()
+		self.copy_event = cl.enqueue_copy(queue, self.result_np, self.result_g)
+		# queue.finish()
 
 		# print(self.num_perms)
 		print(f"Elapsed: {elapsed:7.3f}s / {self.total_elapsed:7.3f}s,", end="\t")
 		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
+		return elapsed
+
+	def collect_data(self, output_dict):
+		self.copy_event.wait()
 		for i in range(self.n):
 			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
 			counts = self.result_np[i,:MAX_TARGET]
@@ -125,7 +130,6 @@ class DataSet:
 			# self.update_extra_stats(i)
 			output_dict[numbers] += counts
 
-		return elapsed
 
 
 
@@ -263,7 +267,10 @@ class CountdownGame:
 			# break
 
 		for data_set in self.data_sets:
-			data_set.await_kernel(self.queue, self.output_dict)
+			data_set.await_kernel(self.queue)
+
+		for data_set in self.data_sets:
+			data_set.collect_data(self.output_dict)
 			# break
 
 	def update_extra_stats(self, i):
