@@ -34,11 +34,12 @@ def time_function(f):
 
 class DataSet:
 
-	def __init__(self, num_perms, expressions, ctx):
+	def __init__(self, num_perms, expressions, total_perms, ctx):
 		self.num_perms = num_perms
 		self.expressions_np = np.array(expressions, dtype=np.int32)
 		self.n = len(expressions)
-		self.total_perms = self.num_perms * self.n
+		self.num_perms = self.num_perms * self.n
+		self.total_perms = total_perms
 		self.setup_buffers(ctx)
 
 	# @time_function
@@ -60,27 +61,25 @@ class DataSet:
 
 	def run(self, prg, queue, output_dict):
 		t0 = clock()
-		# self.data_np[:data.shape[0],:] = data
-		# self.dims_np[:2] = data.shape
-		# self.dims_np[2] = num_perms
 
-		elapsed = self.run_kernel(prg, queue, output_dict)
-		# parsed_perms += num_perms * data.shape[0]
+		elapsed = self.start_kernel(prg, queue, output_dict)
 		t1 = clock()
 		total_elapsed = t1 - t0
 		print(f"Elapsed: {elapsed:7.3f}s / {total_elapsed:7.3f}s,", end="\t")
-		# print(f"Done with {100 * parsed_perms / self.total_perms:6.2f}%\n")
+		print(f"Done with {100 * self.num_perms / self.total_perms:6.2f}%\n")
 		return elapsed, self.total_perms
 
-	def run_kernel(self, prg, queue, output_dict):
+	def start_kernel(self, prg, queue):
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
 
 		# queue.finish()
-		event = prg.evaluate(queue, (self.n,), None, 
+		self.event = prg.evaluate(queue, (self.n,), None, 
 			self.expressions_g, self.result_g, self.dims_g)
-		event.wait()
-		elapsed = 1e-9*(event.profile.end - event.profile.start)
+
+	def await_kernel(self, queue, output_dict):
+		self.event.wait()
+		elapsed = 1e-9*(self.event.profile.end - self.event.profile.start)
 		cl.enqueue_copy(queue, self.result_np, self.result_g)
 		queue.finish()
 
@@ -193,7 +192,7 @@ class CountdownGame:
 		self.data_sets = []
 		for k, v in data.items():
 			self.np_data[k] = np.array(v)
-			self.data_sets.append(DataSet(k, v, self.ctx))
+			self.data_sets.append(DataSet(k, v, self.total_perms, self.ctx))
 
 		self.max_data_size = max(map(len, data.values()))
 		self.data_np = np.zeros(
