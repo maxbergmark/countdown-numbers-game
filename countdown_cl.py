@@ -209,16 +209,16 @@ class CountdownGame:
 		d = self.data_sets
 		for data_set in d:
 			data_set.start_kernel(self.prg, self.queue)
-			break
+			# break
 
 		for data_set in d:
 			data_set.await_kernel(self.queue)
-			break
+			# break
 
 		for data_set in d:
 			data_set.collect_data(self.output_dict, self.extra_stats)
 			self.total_kernel_time += data_set.kernel_time
-			break
+			# break
 
 		t1 = clock()
 		self.total_elapsed = t1 - t0
