@@ -315,6 +315,8 @@ class CountdownGame:
 		combined_set.start_kernel(self.prg, self.queue)
 		combined_set.await_kernel(self.queue)
 		combined_set.collect_data(self.output_dict, self.extra_stats)
+		self.total_elapsed = 0
+		return
 
 		for data_set in d:
 			data_set.start_kernel(self.prg, self.queue)
