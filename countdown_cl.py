@@ -29,6 +29,14 @@ def time_function(f):
 		return res
 	return wrapped
 
+def round_to_warp_size(n):
+	return n if n % 32 == 0 else n + 32 - (n % 32)
+
+class CombinedDataSet:
+
+	def __init__(self, data_sets):
+		pass
+
 class DataSet:
 
 	num_batches = 0
@@ -40,6 +48,7 @@ class DataSet:
 		self.num_perms = num_perms
 		self.expressions_np = np.array(expressions, dtype=np.int32)
 		self.n = len(expressions)
+		self.rounded_n = round_to_warp_size(self.n)
 		self.total_dataset_perms = self.num_perms * self.n
 
 		DataSet.total_perms += self.total_dataset_perms
@@ -49,17 +58,23 @@ class DataSet:
 	def setup_buffers(self, ctx):
 		mf = cl.mem_flags
 
-		self.dims_np = np.array(
-			[self.n, NUM_TOKENS, self.num_perms], dtype=np.int32)
+		self.data_set_start_idxs_np = np.array([0, self.rounded_n], dtype=np.int32)
+		self.data_set_sizes_np = np.array([self.n], dtype=np.int32)
+		self.data_set_num_perms_np = np.array([self.num_perms], dtype=np.int32)
+
 		self.result_np = np.empty(
-			(self.n, MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
+			(self.rounded_n, MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
 
 		self.expressions_g = cl.Buffer(ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.expressions_np)
 		self.result_g = cl.Buffer(ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.result_np)
-		self.dims_g = cl.Buffer(ctx, 
-			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
+		self.data_set_start_idxs_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.data_set_start_idxs_np)
+		self.data_set_sizes_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.data_set_sizes_np)
+		self.data_set_num_perms_g = cl.Buffer(ctx, 
+			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.data_set_num_perms_np)
 
 
 	def start_kernel(self, prg, queue):
@@ -69,9 +84,13 @@ class DataSet:
 			f"{self.n:6d} items, {self.num_perms:8d} permutations")
 
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
-		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
-		self.event = prg.evaluate(queue, (self.n,), None, 
-			self.expressions_g, self.result_g, self.dims_g)
+		cl.enqueue_copy(queue, self.data_set_start_idxs_g, self.data_set_start_idxs_np)
+		cl.enqueue_copy(queue, self.data_set_sizes_g, self.data_set_sizes_np)
+		cl.enqueue_copy(queue, self.data_set_num_perms_g, self.data_set_num_perms_np)
+
+		self.event = prg.evaluate(queue, (self.rounded_n,), None, 
+			self.expressions_g, self.result_g, self.data_set_start_idxs_g, 
+			self.data_set_sizes_g, self.data_set_num_perms_g, np.int32(1))
 
 	def await_kernel(self, queue):
 		self.event.wait()
@@ -187,15 +206,19 @@ class CountdownGame:
 	def run_all_data_sets(self):
 		print()
 		t0 = clock()
-		for data_set in self.data_sets:
+		d = self.data_sets
+		for data_set in d:
 			data_set.start_kernel(self.prg, self.queue)
+			break
 
-		for data_set in self.data_sets:
+		for data_set in d:
 			data_set.await_kernel(self.queue)
+			break
 
-		for data_set in self.data_sets:
+		for data_set in d:
 			data_set.collect_data(self.output_dict, self.extra_stats)
 			self.total_kernel_time += data_set.kernel_time
+			break
 
 		t1 = clock()
 		self.total_elapsed = t1 - t0

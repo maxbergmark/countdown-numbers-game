@@ -119,21 +119,41 @@ bool check_rpn(int tokens[NUM_TOKENS]) {
 	return true;
 }
 
+/*
+	data_set_start_idxs = [0, 480, 480+1440, ...] (even multiples of 32)
+	data_set_sizes = [480, 1440, 37080, ...] (actual sizes)
+	data_set_num_perms = [41580, 207900, 415800, ...]
+*/
+
+int find_data_set_idx(int tid, __constant int *data_set_start_idxs, int n) {
+	for (int i = 0; i < n; i++) {
+		if (tid < data_set_start_idxs[i+1]) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 kernel void evaluate(__global int *data_g, __global int *result, 
-	__constant int *dims) {
+	__constant int *data_set_start_idxs, 
+	__constant int *data_set_sizes, 
+	__constant int *data_set_num_perms, int num_data_sets) {
 	
-	int tid = get_global_id(0);
-	int idx = dims[1] * tid;
+	int global_id = get_global_id(0);
+	int data_set_idx = find_data_set_idx(global_id, data_set_start_idxs, num_data_sets);
+	int tid = global_id - data_set_start_idxs[data_set_idx];
+	if (tid >= data_set_sizes[data_set_idx]) {
+		return;
+	}
+	int idx = NUM_TOKENS * tid;
 	int local_data[NUM_TOKENS];
 	for (int i = 0; i < NUM_TOKENS; i++) {
 		local_data[i] = data_g[i + idx];
 	}
-	// print(local_data, NUM_TOKENS);
-	// printf("%d %d %d\n", dims[0], dims[1], dims[2]);
 	
 	int *first = &local_data[0];
 	int *last = &local_data[NUM_TOKENS];
-	int limit = dims[2];
+	int limit = data_set_num_perms[data_set_idx];
 	int rpn_res[RPN_STACK_SIZE];
 	int rpn_n;
 	
