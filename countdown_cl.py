@@ -48,6 +48,7 @@ class CombinedDataSet:
 		offset = 0
 		for d in data_sets:
 			self.expressions_np[offset:offset+d.n,:] = d.expressions_np
+			print(d.rounded_n)
 			offset += d.rounded_n
 
 		self.num_data_sets = np.int32(len(data_sets))
@@ -59,7 +60,7 @@ class CombinedDataSet:
 
 		self.data_set_sizes_np = np.array([d.n for d in self.data_sets], dtype=np.int32)
 		self.data_set_start_idxs_np = np.cumsum(
-			[0] + list(self.data_set_sizes_np), dtype=np.int32)
+			[0] + [d.rounded_n for d in self.data_sets], dtype=np.int32)
 		
 		self.data_set_num_perms_np = np.array(
 			[d.num_perms for d in self.data_sets], dtype=np.int32)
@@ -83,6 +84,14 @@ class CombinedDataSet:
 		print(f"Running batch {self.idx+1:2d}/{DataSet.num_batches:2d}:", 
 			f"({current_part:7.3f}%)", 
 			f"{self.n:6d} items, {sum(self.num_perms):8d} permutations")
+
+
+		print(self.data_set_num_perms_np)
+		print(self.data_set_sizes_np)
+		print(self.data_set_start_idxs_np)
+		print(self.rounded_n)
+		print(self.result_np.shape)
+
 
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.data_set_start_idxs_g, self.data_set_start_idxs_np)
@@ -110,18 +119,9 @@ class CombinedDataSet:
 	# 1750004 + 22988476 = 24738480
 	def collect_data(self, output_dict, extra_stats):
 		self.copy_event.wait()
-		"""
-		print(self.data_set_num_perms_np)
-		print(self.data_set_sizes_np)
-		print(self.data_set_start_idxs_np)
-		print(self.rounded_n)
-		print(self.result_np.shape)
-		print(self.result_np)
-		print(self.result_np[0:480,:MAX_TARGET].sum())
-		print(self.result_np[480:,:MAX_TARGET].sum())
-		plt.imshow(self.result_np**.01)
-		plt.show()
-		"""
+		# plt.imshow(self.result_np**.01)
+		# plt.show()
+
 		for i in range(self.rounded_n):
 			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
 			counts = self.result_np[i,:MAX_TARGET]
@@ -360,7 +360,7 @@ class CountdownGame:
 		with open(self.output_filename, "wb") as f:
 			np.savetxt(f, self.output_np, fmt='%d', delimiter=",")
 
-
-game = CountdownGame()
-game.run_all_data_sets()
-game.verify_and_save()
+if __name__ == "__main__":
+	game = CountdownGame()
+	game.run_all_data_sets()
+	game.verify_and_save()
