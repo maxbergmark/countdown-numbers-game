@@ -124,6 +124,8 @@ class CombinedDataSet:
 
 		for i in range(self.rounded_n):
 			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
+			if sum(numbers) == 0:
+				continue
 			counts = self.result_np[i,:MAX_TARGET]
 			output_dict[numbers] += counts
 			self.update_extra_stats(i, extra_stats)
