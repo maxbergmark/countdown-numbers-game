@@ -1,5 +1,6 @@
 #define NUM_TOKENS 11
 #define MAX_TARGET 1000
+#define RPN_STACK_SIZE 10
 
 #define NUM_EXTRA_VALUES 4
 #define SUBTRACTION_FAIL_INDEX 1000
@@ -55,14 +56,14 @@ void print(int nums[], int n) {
 	printf("\n");
 }
 
-void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n, 
+void evaluate_rpn(int tokens[NUM_TOKENS], int res[RPN_STACK_SIZE], int *res_n, 
 	int local_result[MAX_TARGET + NUM_EXTRA_VALUES]) {
 
-	int stack[10];
+	int stack[RPN_STACK_SIZE];
 	int stack_i = 0;
 	int res_i = 0;
 
-	for (int i = 0; i < n; i++) {
+	for (int i = 0; i < NUM_TOKENS; i++) {
 		int token = tokens[i];
 		if (token > 0) {
 			stack[stack_i++] = token;
@@ -107,26 +108,15 @@ void evaluate_rpn(int tokens[NUM_TOKENS], int res[10], int n, int *res_n,
 
 bool check_rpn(int tokens[NUM_TOKENS]) {
 	int s = 0;
-	bool result = true;
 	for (int i = 0; i < NUM_TOKENS; i++) {
 		int token = tokens[i];
 		int valence = 2 * (token < 0);
 		s += 1 - valence;
-		result &= s <= 0;
-		// if (s <= 0) {
-			// return false;
-		// }
+		if (s <= 0) {
+			return false;
+		}
 	}
-	return result;
-	// return true;
-}
-
-int fac(int n) {
-	int p = 1;
-	for (int i = 1; i <= n; i++) {
-		p *= i;
-	}
-	return p;
+	return true;
 }
 
 kernel void evaluate(__global int *data_g, __global int *result, 
@@ -138,11 +128,13 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	for (int i = 0; i < NUM_TOKENS; i++) {
 		local_data[i] = data_g[i + idx];
 	}
+	// print(local_data, NUM_TOKENS);
+	// printf("%d %d %d\n", dims[0], dims[1], dims[2]);
 	
 	int *first = &local_data[0];
 	int *last = &local_data[NUM_TOKENS];
 	int limit = dims[2];
-	int rpn_res[10];
+	int rpn_res[RPN_STACK_SIZE];
 	int rpn_n;
 	
 	int local_result[MAX_TARGET + NUM_EXTRA_VALUES];
@@ -153,7 +145,7 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	for (int i = 0; i < limit; i++) {
 		bool check = check_rpn(local_data);
 		if (check) {
-			evaluate_rpn(local_data, rpn_res, NUM_TOKENS, &rpn_n, local_result);
+			evaluate_rpn(local_data, rpn_res, &rpn_n, local_result);
 			for (int j = 0; j < rpn_n; j++) {
 				int val = rpn_res[j];
 				int in_range = 0 <= val & val < MAX_TARGET;
