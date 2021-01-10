@@ -145,10 +145,10 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	if (tid >= data_set_sizes[data_set_idx]) {
 		return;
 	}
-	int idx = NUM_TOKENS * tid;
+	// int idx = NUM_TOKENS * tid;
 	int local_data[NUM_TOKENS];
 	for (int i = 0; i < NUM_TOKENS; i++) {
-		local_data[i] = data_g[i + idx];
+		local_data[i] = data_g[NUM_TOKENS * global_id + i];
 	}
 	
 	int *first = &local_data[0];
@@ -179,7 +179,7 @@ kernel void evaluate(__global int *data_g, __global int *result,
 	}
 
 	for (int i = 0; i < MAX_TARGET + NUM_EXTRA_VALUES; i++) {
-		result[(MAX_TARGET + NUM_EXTRA_VALUES) * tid + i] = local_result[i];
+		result[(MAX_TARGET + NUM_EXTRA_VALUES) * global_id + i] = local_result[i];
 	}
 
 }
