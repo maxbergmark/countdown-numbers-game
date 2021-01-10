@@ -79,19 +79,20 @@ class CombinedDataSet:
 		self.data_set_num_perms_g = cl.Buffer(ctx, 
 			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.data_set_num_perms_np)
 
+	@time_function
 	def start_kernel(self, prg, queue):
 		current_part = 100 * self.total_dataset_perms / self.total_perms
 		print(f"Running batch {self.idx+1:2d}/{DataSet.num_batches:2d}:", 
 			f"({current_part:7.3f}%)", 
 			f"{self.n:6d} items, {sum(self.num_perms):8d} permutations")
 
-
+		"""
 		print(self.data_set_num_perms_np)
 		print(self.data_set_sizes_np)
 		print(self.data_set_start_idxs_np)
 		print(self.rounded_n)
 		print(self.result_np.shape)
-
+		"""
 
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.data_set_start_idxs_g, self.data_set_start_idxs_np)
@@ -102,6 +103,7 @@ class CombinedDataSet:
 			self.expressions_g, self.result_g, self.data_set_start_idxs_g, 
 			self.data_set_sizes_g, self.data_set_num_perms_g, self.num_data_sets)
 
+	@time_function
 	def await_kernel(self, queue):
 		self.event.wait()
 		t1_ns = self.event.profile.end
@@ -117,6 +119,7 @@ class CombinedDataSet:
 	# expecting 24738480 * 2 = 49476960
 	# got 22988476 (24738480 - 22988476 = 1750004)
 	# 1750004 + 22988476 = 24738480
+	@time_function
 	def collect_data(self, output_dict, extra_stats):
 		self.copy_event.wait()
 		# plt.imshow(self.result_np**.01)
@@ -317,7 +320,8 @@ class CountdownGame:
 		combined_set.start_kernel(self.prg, self.queue)
 		combined_set.await_kernel(self.queue)
 		combined_set.collect_data(self.output_dict, self.extra_stats)
-		self.total_elapsed = 0
+		t1 = clock()
+		self.total_elapsed = t1 - t0
 		return
 
 		for data_set in d:
