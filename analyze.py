@@ -4,6 +4,8 @@ from sympy import isprime
 from enum import Enum
 import os
 
+NUM_NUMBERS = 6
+
 def pretty_print(f):
 	def wrapped(*args, **kw):
 		n = len(f.__name__)
@@ -40,11 +42,11 @@ class Analyzer:
 	def format_data(self):
 		data = self.load_data()
 		n = data.shape[0]
-		data.shape = (n // 1006, 1006)
+		data.shape = (n // (NUM_NUMBERS + 1000), (NUM_NUMBERS + 1000))
 		self.offset = 0 if self.include else 100
 
-		self.boards = data[:,:6]
-		self.counts = data[:,6+self.offset:]
+		self.boards = data[:,:NUM_NUMBERS]
+		self.counts = data[:,NUM_NUMBERS+self.offset:]
 		self.numbers = np.arange(self.offset, 1000)
 		self.numbers_per_board = (self.counts[:,:] > 0).sum(axis=1)
 		self.boards_per_number = (self.counts[:,:] > 0).sum(axis=0)
@@ -93,7 +95,7 @@ class Analyzer:
 		print("Distribution of high digits (25-100) among these boards:")
 		for i, n in enumerate(high_digits_hist):
 			print(f"    {i} high digits: {len(n)} boards")
-			if i in (0, 3):
+			if i in (0, 3) or len(high_digits_hist[i]) < 10:
 				for eb in high_digits_hist[i]:
 					print(" "*8 + str(eb))
 
