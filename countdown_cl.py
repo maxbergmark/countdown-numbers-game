@@ -6,16 +6,9 @@ from collections import defaultdict
 from math import factorial
 import sys
 
-NUM_NUMBERS = 6
-NUM_SYMBOLS = NUM_NUMBERS - 1
-NUM_TOKENS = NUM_NUMBERS + NUM_SYMBOLS
-MAX_TARGET = 1000
+from data_set import DataSet
+from configuration import *
 
-NUM_EXTRA_VALUES = 4
-SUBTRACTION_FAIL_INDEX = 1000
-DIVISION_FAIL_INDEX = 1001
-PERMUTATION_FAIL_INDEX = 1002
-PERMUTATION_SUCCESS_INDEX = 1003
 
 KERNEL_NAME = "countdown_kernel.cl"
 
@@ -29,83 +22,6 @@ def time_function(f):
 		return res
 	return wrapped
 
-class DataSet:
-
-	num_batches = 0
-	completed_perms = 0
-	total_perms = 0
-
-	def __init__(self, idx, num_perms, expressions, ctx):
-		self.idx = idx
-		self.num_perms = num_perms
-		self.expressions_np = np.array(expressions, dtype=np.int32)
-		self.n = len(expressions)
-		self.total_dataset_perms = self.num_perms * self.n
-
-		DataSet.total_perms += self.total_dataset_perms
-		DataSet.num_batches += 1
-		self.setup_buffers(ctx)
-
-	def setup_buffers(self, ctx):
-		mf = cl.mem_flags
-
-		self.dims_np = np.array(
-			[self.n, NUM_TOKENS, self.num_perms], dtype=np.int32)
-		self.result_np = np.empty(
-			(self.n, MAX_TARGET + NUM_EXTRA_VALUES), dtype=np.int32)
-
-		self.expressions_g = cl.Buffer(ctx, 
-			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.expressions_np)
-		self.result_g = cl.Buffer(ctx, 
-			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.result_np)
-		self.dims_g = cl.Buffer(ctx, 
-			mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.dims_np)
-
-
-	def start_kernel(self, prg, queue):
-		current_part = 100 * self.total_dataset_perms / self.total_perms
-		print(f"Running batch {self.idx+1:2d}/{DataSet.num_batches:2d}:", 
-			f"({current_part:7.3f}%)", 
-			f"{self.n:6d} items, {self.num_perms:8d} permutations")
-
-		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
-		cl.enqueue_copy(queue, self.dims_g, self.dims_np)
-		self.event = prg.evaluate(queue, (self.n,), None, 
-			self.expressions_g, self.result_g, self.dims_g)
-
-	def await_kernel(self, queue):
-		self.event.wait()
-		t1_ns = self.event.profile.end
-		t0_ns = self.event.profile.start
-		self.kernel_time = 1e-9*(t1_ns - t0_ns)
-		self.copy_event = cl.enqueue_copy(queue, self.result_np, self.result_g)
-		DataSet.completed_perms += self.total_dataset_perms
-		progress = DataSet.completed_perms / DataSet.total_perms
-
-		print(f"Kernel time: {self.kernel_time:7.3f}s,", end="\t")
-		print(f"Done with {100 * progress:6.2f}%")
-
-	def collect_data(self, output_dict, extra_stats):
-		self.copy_event.wait()
-		for i in range(self.n):
-			numbers = tuple(self.expressions_np[i,-NUM_NUMBERS:])
-			counts = self.result_np[i,:MAX_TARGET]
-			output_dict[numbers] += counts
-			self.update_extra_stats(i, extra_stats)
-
-	def update_extra_stats(self, i, extra_stats):
-		keys = ("division_fails", "subtraction_fails", 
-			"permutation_fails", "permutation_successes")
-		indices = (DIVISION_FAIL_INDEX, SUBTRACTION_FAIL_INDEX, 
-			PERMUTATION_FAIL_INDEX, PERMUTATION_SUCCESS_INDEX)
-
-		for key, index in zip(keys, indices):
-			extra_stats[key] += self.result_np[i,index]
-
-		total_evaluations = self.result_np[i,:MAX_TARGET].sum()
-		extra_stats["total_evaluations"] += total_evaluations
-
-
 class CountdownGame:
 
 	def __init__(self):
@@ -114,7 +30,7 @@ class CountdownGame:
 		if len(sys.argv) == 2:
 			self.output_filename = sys.argv[1]
 		else:
-			self.output_filename = "/tmp/output.csv"
+			self.output_filename = "/tmp/output_{NUM_NUMBERS}.csv"
 		print(f"Output filename: {self.output_filename}")
 		self.setup_opencl()
 		self.make_kernel()
@@ -135,8 +51,19 @@ class CountdownGame:
 	@time_function
 	def make_kernel(self):
 		kernel = open(KERNEL_NAME, "r").read()
-		self.prg = cl.Program(self.ctx, kernel).build()
-
+		self.prg = cl.Program(self.ctx, kernel).build(
+			options=[
+				"-D", f"NUM_NUMBERS={NUM_NUMBERS}",
+				"-D", f"NUM_SYMBOLS={NUM_SYMBOLS}",
+				"-D", f"NUM_TOKENS={NUM_TOKENS}",
+				"-D", f"MAX_TARGET={MAX_TARGET}",
+				"-D", f"NUM_EXTRA_VALUES={NUM_EXTRA_VALUES}",
+				"-D", f"SUBTRACTION_FAIL_INDEX={SUBTRACTION_FAIL_INDEX}",
+				"-D", f"DIVISION_FAIL_INDEX={DIVISION_FAIL_INDEX}",
+				"-D", f"PERMUTATION_FAIL_INDEX={PERMUTATION_FAIL_INDEX}",
+				"-D", f"PERMUTATION_SUCCESS_INDEX={PERMUTATION_SUCCESS_INDEX}"
+			]
+		)
 
 	@property
 	def operators(self):
@@ -155,7 +82,7 @@ class CountdownGame:
 
 	def get_numbers(self):
 		big_numbers = [25, 50, 75, 100]
-		small_numbers = list(range(1, NUM_TOKENS))*2
+		small_numbers = list(range(1, 11))*2
 		choices = set(map(
 			lambda l: tuple(sorted(l)), 
 			combinations(big_numbers + small_numbers, NUM_NUMBERS)))
@@ -173,8 +100,8 @@ class CountdownGame:
 		data = defaultdict(list)
 		mapped_operators = list(map(self.map_operators, self.operators))
 		self.numbers = self.get_numbers()
-		for n in self.numbers:
-			for o in mapped_operators:
+		for o in mapped_operators:
+			for n in self.numbers:
 				expression = sorted(o) + list(n)
 				perms = self.calculate_perms(expression)
 				data[perms].append(expression)
@@ -184,7 +111,20 @@ class CountdownGame:
 			self.data_sets.append(DataSet(i, num_perms, expressions, self.ctx))
 
 
-	def run_all_data_sets(self):
+	def run_all_data_sets_sequential(self):
+		print()
+		t0 = clock()
+		for data_set in self.data_sets:
+			data_set.start_kernel(self.prg, self.queue)
+			data_set.await_kernel(self.queue)
+			data_set.collect_data(self.output_dict, self.extra_stats)
+			self.total_kernel_time += data_set.kernel_time
+
+		t1 = clock()
+		self.total_elapsed = t1 - t0
+
+
+	def run_all_data_sets_parallel(self):
 		print()
 		t0 = clock()
 		for data_set in self.data_sets:
@@ -227,6 +167,8 @@ class CountdownGame:
 			np.savetxt(f, self.output_np, fmt='%d', delimiter=",")
 
 
+
 game = CountdownGame()
-game.run_all_data_sets()
+# game.run_all_data_sets_sequential()
+game.run_all_data_sets_parallel()
 game.verify_and_save()
