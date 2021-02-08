@@ -30,7 +30,7 @@ class CountdownGame:
 		if len(sys.argv) == 2:
 			self.output_filename = sys.argv[1]
 		else:
-			self.output_filename = "/tmp/output.csv"
+			self.output_filename = "/tmp/output_{NUM_NUMBERS}.csv"
 		print(f"Output filename: {self.output_filename}")
 		self.setup_opencl()
 		self.make_kernel()
