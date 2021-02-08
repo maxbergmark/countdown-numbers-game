@@ -64,7 +64,7 @@ If we have the RPN expression:
 
 We parse it from left to right, adding numbers to the stack as we go along. After each token in the expression is parsed, we check the size of the stack. If there is only one element on the stack, we save that element as a partial result in an output array. We would parse it like this:
 
-	Token	Stack	Output
+	Token		Stack		Output
 	2		[2]		[2]
 	1		[2,1]		[2]
 	+		[3]		[2,3]
