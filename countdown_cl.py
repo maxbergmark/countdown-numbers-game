@@ -125,6 +125,7 @@ class CountdownGame:
 		combined_set.start_kernel(self.prg, self.queue)
 		combined_set.await_kernel(self.queue)
 		combined_set.collect_data(self.output_dict, self.extra_stats)
+		self.total_kernel_time += combined_set.kernel_time
 		t1 = clock()
 		self.total_elapsed = t1 - t0
 		return
@@ -173,6 +174,6 @@ class CountdownGame:
 
 if __name__ == "__main__":
 	game = CountdownGame()
-	game.run_all_data_sets_sequential()
-	# game.run_all_data_sets_parallel()
+	# game.run_all_data_sets_sequential()
+	game.run_all_data_sets_parallel()
 	game.verify_and_save()

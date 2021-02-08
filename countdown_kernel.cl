@@ -189,7 +189,7 @@ kernel void evaluate(__global Tokens *data_g, __global struct Result *result,
 	}
 	Tokens local_data;
 	for (int i = 0; i < NUM_TOKENS; i++) {
-		local_data[i] = data_g[tid][i];
+		local_data[i] = data_g[global_id][i];
 	}
 	
 	int limit = data_set_num_perms[data_set_idx];
@@ -199,7 +199,7 @@ kernel void evaluate(__global Tokens *data_g, __global struct Result *result,
 	
 	run_simulation(local_data, limit, &local_result);
 
-	update_result(result, &local_result, tid);
+	update_result(result, &local_result, global_id);
 	
 }
 
