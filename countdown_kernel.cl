@@ -117,51 +117,67 @@ bool check_rpn(int tokens[NUM_TOKENS]) {
 	return true;
 }
 
+void run_simulation(Tokens local_data, int limit, struct Result *local_result) {
+	int *first = (int*) &local_data[0];
+	int *last = (int*) &local_data[NUM_TOKENS];
+	int rpn_res[RPN_STACK_SIZE];
+	int rpn_n;
+	
+	for (int i = 0; i < limit; i++) {
+		bool check = check_rpn(local_data);
+		if (check) {
+			evaluate_rpn(local_data, rpn_res, &rpn_n, local_result);
+			for (int j = 0; j < rpn_n; j++) {
+				int val = rpn_res[j];
+				int in_range = 0 <= val & val < MAX_TARGET;
+				local_result->counts[val * in_range] += in_range;
+			}
+			local_result->extra_stats[PERMUTATION_SUCCESS_INDEX]++;
+		} else {
+			local_result->extra_stats[PERMUTATION_FAIL_INDEX]++;
+		}
+		next_permutation(first, last);
+	}
+}
+
+void zero_result(struct Result *result) {
+	for (int i = 0; i < MAX_TARGET; i++) {
+		result->counts[i] = 0;
+	}
+	for (int i = 0; i < NUM_EXTRA_VALUES; i++) {
+		result->extra_stats[i] = 0;
+	}
+}
+
+void update_result(__global struct Result *result, 
+	struct Result *local_result, int tid) {
+	
+	for (int i = 0; i < MAX_TARGET; i++) {
+		result[tid].counts[i] = local_result->counts[i];
+	}
+	for (int i = 0; i < NUM_EXTRA_VALUES; i++) {
+		result[tid].extra_stats[i] = local_result->extra_stats[i];
+	}	
+}
+
 kernel void evaluate(
-	__global Tokens *data_g, __global struct Result *result, 
+	__global Tokens *data_g, 
+	__global struct Result *result, 
 	__constant int *dims) {
 	
 	int tid = get_global_id(0);
+	int limit = dims[2];
 	Tokens local_data;
 	for (int i = 0; i < NUM_TOKENS; i++) {
 		local_data[i] = data_g[tid][i];
 	}
-	
-	int *first = &local_data[0];
-	int *last = &local_data[NUM_TOKENS];
-	int limit = dims[2];
-	int rpn_res[RPN_STACK_SIZE];
-	int rpn_n;
-	
+
 	struct Result local_result;
-	for (int i = 0; i < MAX_TARGET; i++) {
-		local_result.counts[i] = 0;
-	}
-	for (int i = 0; i < NUM_EXTRA_VALUES; i++) {
-		local_result.extra_stats[i] = 0;
-	}
+	zero_result(&local_result);
+	
+	run_simulation(local_data, limit, &local_result);
 
-	for (int i = 0; i < limit; i++) {
-		bool check = check_rpn(local_data);
-		if (check) {
-			evaluate_rpn(local_data, rpn_res, &rpn_n, &local_result);
-			for (int j = 0; j < rpn_n; j++) {
-				int val = rpn_res[j];
-				int in_range = 0 <= val & val < MAX_TARGET;
-				local_result.counts[val * in_range] += in_range;
-			}
-			local_result.extra_stats[PERMUTATION_SUCCESS_INDEX]++;
-		} else {
-			local_result.extra_stats[PERMUTATION_FAIL_INDEX]++;
-		}
-		next_permutation(first, last);
-	}
+	update_result(result, &local_result, tid);
 
-	for (int i = 0; i < MAX_TARGET; i++) {
-		result[tid].counts[i] = local_result.counts[i];
-	}
-	for (int i = 0; i < NUM_EXTRA_VALUES; i++) {
-		result[tid].extra_stats[i] = local_result.extra_stats[i];
-	}
 
 }
