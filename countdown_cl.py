@@ -174,6 +174,6 @@ class CountdownGame:
 
 if __name__ == "__main__":
 	game = CountdownGame()
-	# game.run_all_data_sets_sequential()
-	game.run_all_data_sets_parallel()
+	game.run_all_data_sets_sequential()
+	# game.run_all_data_sets_parallel()
 	game.verify_and_save()

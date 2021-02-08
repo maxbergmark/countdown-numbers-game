@@ -202,17 +202,3 @@ kernel void evaluate(__global Tokens *data_g, __global struct Result *result,
 	update_result(result, &local_result, global_id);
 	
 }
-
-/*
-kernel void evaluate(
-	__global Tokens *data_g, 
-	__global struct Result *result, 
-	__constant int *dims) {
-	
-	int tid = get_global_id(0);
-	int limit = dims[2];
-
-
-
-}
-*/

@@ -74,14 +74,6 @@ class CombinedDataSet:
 			f"({current_part:7.3f}%)", 
 			f"{self.n:6d} items, {sum(self.num_perms):8d} permutations")
 
-		"""
-		print(self.data_set_num_perms_np)
-		print(self.data_set_sizes_np)
-		print(self.data_set_start_idxs_np)
-		print(self.rounded_n)
-		print(self.result_np.shape)
-		"""
-
 		cl.enqueue_copy(queue, self.expressions_g, self.expressions_np)
 		cl.enqueue_copy(queue, self.data_set_start_idxs_g, self.data_set_start_idxs_np)
 		cl.enqueue_copy(queue, self.data_set_sizes_g, self.data_set_sizes_np)
