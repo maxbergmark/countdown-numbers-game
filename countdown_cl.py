@@ -6,8 +6,12 @@ from collections import defaultdict
 from math import factorial
 import sys
 import matplotlib.pyplot as plt
+from datetime import datetime
+from pathlib import Path
 
-from data_set import DataSet, CombinedDataSet, time_function
+from data_set import (
+	DataSet, CombinedDataSet, time_function, 
+	print_data_set_header, print_data_set_footer)
 from configuration import *
 
 
@@ -22,7 +26,8 @@ class CountdownGame:
 		if len(sys.argv) == 2:
 			self.output_filename = sys.argv[1]
 		else:
-			self.output_filename = "/tmp/output_{NUM_NUMBERS}.csv"
+			Path("./data").mkdir(parents=True, exist_ok=True)
+			self.output_filename = f"./data/output_{NUM_NUMBERS}.csv"
 		print(f"Output filename: {self.output_filename}")
 		self.setup_opencl()
 		self.make_kernel()
@@ -31,6 +36,11 @@ class CountdownGame:
 		self.extra_stats = defaultdict(int)
 		
 		self.generate_data_sets()
+		print(f"\nNumber of batches: {DataSet.num_batches}")
+		print(f"Number of data sets: {len(self.numbers)}")
+		print(f"Number of expressions: {DataSet.total_expressions}")
+		print(("Total number of permutations: "
+			f"{DataSet.total_perms} ({DataSet.total_perms:.3e})"))
 		self.output_np = np.zeros(
 			(len(self.numbers), NUM_NUMBERS + MAX_TARGET), dtype=np.int32)
 
@@ -92,6 +102,7 @@ class CountdownGame:
 		data = defaultdict(list)
 		mapped_operators = list(map(self.map_operators, self.operators))
 		self.numbers = self.get_numbers()
+
 		for o in mapped_operators:
 			for n in self.numbers:
 				expression = sorted(o) + list(n)
@@ -101,11 +112,12 @@ class CountdownGame:
 		self.data_sets = []
 		for i, (num_perms, expressions) in enumerate(data.items()):
 			self.data_sets.append(DataSet(i, num_perms, expressions, self.ctx))
-		print("data sets:", len(self.data_sets))
 
 
 	def run_all_data_sets_sequential(self):
 		print()
+		print_data_set_header()
+		DataSet.simulation_start_time = datetime.now()
 		t0 = clock()
 		for data_set in self.data_sets:
 			data_set.start_kernel(self.prg, self.queue)
@@ -114,10 +126,27 @@ class CountdownGame:
 			self.total_kernel_time += data_set.kernel_time
 
 		t1 = clock()
+		print_data_set_footer()
 		self.total_elapsed = t1 - t0
 
 
 	def run_all_data_sets_parallel(self):
+		print()
+		t0 = clock()
+		for data_set in d:
+			data_set.start_kernel(self.prg, self.queue)
+
+		for data_set in d:
+			data_set.await_kernel(self.queue)
+
+		for data_set in d:
+			data_set.collect_data(self.output_dict, self.extra_stats)
+			self.total_kernel_time += data_set.kernel_time
+
+		t1 = clock()
+		self.total_elapsed = t1 - t0
+
+	def run_all_data_sets_combined(self):
 		print()
 		t0 = clock()
 		d = self.data_sets[:]
@@ -126,23 +155,6 @@ class CountdownGame:
 		combined_set.await_kernel(self.queue)
 		combined_set.collect_data(self.output_dict, self.extra_stats)
 		self.total_kernel_time += combined_set.kernel_time
-		t1 = clock()
-		self.total_elapsed = t1 - t0
-		return
-
-		for data_set in d:
-			data_set.start_kernel(self.prg, self.queue)
-			# break
-
-		for data_set in d:
-			data_set.await_kernel(self.queue)
-			# break
-
-		for data_set in d:
-			data_set.collect_data(self.output_dict, self.extra_stats)
-			self.total_kernel_time += data_set.kernel_time
-			# break
-
 		t1 = clock()
 		self.total_elapsed = t1 - t0
 
@@ -156,7 +168,13 @@ class CountdownGame:
 
 	def verify_and_save(self):
 		total_permutations = 0
-		target_sum = 119547486361
+		target_sums = {2: 516, 3: 62418, 4: 7468178, 
+			5: 927111333, 6: 119547486361}
+		if NUM_NUMBERS not in target_sums:
+			target_sum = 0
+		else:
+			target_sum = target_sums[NUM_NUMBERS]
+	
 		for v in self.output_dict.values():
 			total_permutations += v.sum()
 
