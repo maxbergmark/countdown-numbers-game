@@ -4,7 +4,7 @@ from sympy import isprime
 from enum import Enum
 import os
 
-from configuration import NUMBERS
+from configuration import NUM_NUMBERS, MAX_TARGET
 
 def pretty_print(f):
 	def wrapped(*args, **kw):
@@ -24,14 +24,15 @@ class Analyzer:
 	def __init__(self, include_below_100 = False):
 		self.include = include_below_100
 		self.format_data()
+		print(f"Total number of boards: {self.boards.shape[0]}")
 
 	def load_data(self):
-		dat_filename = f"output_{NUM_NUMBERS}.dat"
-		csv_filename = f"output_{NUM_NUMBERS}.csv"
+		dat_filename = f"./data/output_{NUM_NUMBERS}.dat"
+		csv_filename = f"./data/output_{NUM_NUMBERS}.csv"
 		if os.path.isfile(dat_filename):
 			data = np.fromfile(dat_filename, dtype=np.int32)
 			n = data.shape[0]
-			data.shape = (n // (NUM_NUMBERS + 1000), NUM_NUMBERS + 1000)
+			data.shape = (n // (NUM_NUMBERS + MAX_TARGET), NUM_NUMBERS + MAX_TARGET)
 		elif os.path.isfile(csv_filename):
 			data = np.loadtxt(open(csv_filename, "rb"), 
 				delimiter=",", skiprows=0, dtype=np.int32)
@@ -47,7 +48,7 @@ class Analyzer:
 
 		self.boards = data[:,:NUM_NUMBERS]
 		self.counts = data[:,NUM_NUMBERS+self.offset:]
-		self.numbers = np.arange(self.offset, 1000)
+		self.numbers = np.arange(self.offset, MAX_TARGET)
 		self.numbers_per_board = (self.counts[:,:] > 0).sum(axis=1)
 		self.boards_per_number = (self.counts[:,:] > 0).sum(axis=0)
 
@@ -67,11 +68,16 @@ class Analyzer:
 		print(f"    {self.numbers[mask]}")
 		print("Number of boards that can form these numbers:",
 			self.boards_per_number.max())
-		print("Boards that can't reach these numbers:")
-		for target in self.numbers[mask]:
-			print("Target:", target)
-			for row in self.boards[self.counts[:,target - self.offset] == 0]:
-				print(f"    {row}")
+		if mask.sum() < 10:
+			print("Boards that can't reach these numbers:")
+			for target in self.numbers[mask]:
+				print("Target:", target)
+				easy_boards = self.boards[self.counts[:,target - self.offset] == 0]
+				if easy_boards.shape[0] < 10:
+					for row in self.boards[self.counts[:,target - self.offset] == 0]:
+						print(f"    {row}")
+				else:
+					print(f"    {easy_boards.shape[0]} boards")
 
 	@pretty_print
 	def hardest_numbers(self):
@@ -80,15 +86,18 @@ class Analyzer:
 		ordered_counts = (self.counts[:,indices] > 0).sum(axis=0)
 		print("Hardest numbers to reach:")
 		for number, count in zip(ordered_numbers[:10], ordered_counts[:10]):
-			print(f"    {number}: {count} boards")
+			is_prime = "prime" if isprime(number) else "non-prime"
+			print(f"    {number}: {count} boards {is_prime}")
 
 	@pretty_print
 	def easiest_boards(self):
 		mask = self.numbers_per_board == self.numbers_per_board.max()
 		num_easy_boards = (mask).sum()
 		easy_boards = self.boards[mask,:]
-		print(("Number of boards that can reach all "
-			f"{len(self.numbers)} numbers: {num_easy_boards}"))
+		print(("Number of boards that are the easiest to play: "
+			f"{num_easy_boards}"))
+		print((f"These boards can reach "
+			f"{self.numbers_per_board.max()} / {len(self.numbers)} target numbers"))
 		high_digits_hist = [[] for _ in range(5)]
 		for eb in easy_boards:
 			high_digits_hist[(eb > 10).sum()].append(eb)
@@ -106,7 +115,7 @@ class Analyzer:
 		ordered_boards = self.boards[indices,:]
 		ordered_counts = (self.counts[indices,:] > 0).sum(axis=1)
 		print("Hardest boards:")
-		top_n = 20
+		top_n = 10
 		for idx, board, count in zip(indices[:top_n], 
 				ordered_boards[:top_n], ordered_counts[:top_n]):
 			
@@ -114,23 +123,27 @@ class Analyzer:
 			with np.printoptions(threshold=15):
 				print(f"    {board}: {count} numbers ({reachable})")
 
-	def format_boards_per_number(self, name, avg, std_dev, ax):
+	def format_boards_per_number(self, idxs, name, avg, std_dev, ax, max_limit):
 		print(("Average number of boards able to reach "
-			f"{name + ' numbers:':20s}\t{avg:8.2f} ± {std_dev:8.2f}"))
+			f"{name + ' numbers:':20s}\t{avg:8.2f} ± {std_dev:8.2f}" 
+			f" ({100 * avg / self.boards.shape[0]:6.2f}%)"
+		))
 		ax.set_title(f"Distribution of {name} numbers reachable by x boards")
 		ax.set_xlabel("Number of boards")
 		ax.set_ylabel("Frequency")
-		ax.set_xlim([9000, len(self.boards)])
-		ax.set_ylim([0, 250])
+		ax.set_xlim([0, len(self.boards)])
+		ax.set_ylim([0, max_limit])
 
-	def format_numbers_per_board(self, name, avg, std_dev, ax):
+	def format_numbers_per_board(self, idxs, name, avg, std_dev, ax, max_limit):
 		print((f"Average number of "
 			f"{name + ' numbers reachable per board:':40s}"
-			f"\t{avg:8.2f} ± {std_dev:8.2f}"))
+			f"\t{avg:8.2f} ± {std_dev:8.2f}"
+			f" ({100 * avg / idxs.size:6.2f}%)"
+		))
 		ax.set_title(f"Distribution of boards reaching x {name} numbers")
 		ax.set_xlabel("Possible target numbers")
 		ax.set_ylabel("Frequency")
-		ax.set_ylim([0, 12000])
+		ax.set_ylim([0, max_limit])
 
 	def get_indices(self):
 		all_indices = self.numbers - self.offset
@@ -169,9 +182,12 @@ class Analyzer:
 			avg = c.mean()
 			std_dev = c.std()
 
-			ax.hist(c, bins=30)
+			n, *_ = ax.hist(c, bins=30)
+			if name == "all":
+				max_limit = max(n) * 2
+
 			ax.plot([avg, avg], [0, 100000], 'r')
-			formatter(name, avg, std_dev, ax)
+			formatter(idxs, name, avg, std_dev, ax, max_limit)
 		plt.subplots_adjust(hspace=0.25, top=0.97, left=0.04, right=0.98, bottom=0.04)
 		plt.show()
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-csv_filename = "output.csv"
+csv_filename = "output_7_big.csv"
 output_filename = "output_7_filtered.csv"
 data = np.loadtxt(open(csv_filename, "rb"), 
 	delimiter=",", skiprows=0, dtype=np.int32)
@@ -14,4 +14,4 @@ for row in data:
 
 output = np.array(output)
 print(len(output))
-np.savetxt(output_filename, output, delimiter=",")
+np.savetxt(output_filename, output.astype(int), fmt='%i', delimiter=",")
