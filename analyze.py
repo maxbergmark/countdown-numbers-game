@@ -4,7 +4,11 @@ from sympy import isprime
 from enum import Enum
 import os
 
+<<<<<<< HEAD
 NUM_NUMBERS = 6
+=======
+from configuration import NUMBERS
+>>>>>>> main
 
 def pretty_print(f):
 	def wrapped(*args, **kw):
@@ -26,10 +30,12 @@ class Analyzer:
 		self.format_data()
 
 	def load_data(self):
-		dat_filename = "output.dat"
-		csv_filename = "output.csv"
+		dat_filename = f"output_{NUM_NUMBERS}.dat"
+		csv_filename = f"output_{NUM_NUMBERS}.csv"
 		if os.path.isfile(dat_filename):
 			data = np.fromfile(dat_filename, dtype=np.int32)
+			n = data.shape[0]
+			data.shape = (n // (NUM_NUMBERS + 1000), NUM_NUMBERS + 1000)
 		elif os.path.isfile(csv_filename):
 			data = np.loadtxt(open(csv_filename, "rb"), 
 				delimiter=",", skiprows=0, dtype=np.int32)
@@ -41,8 +47,11 @@ class Analyzer:
 
 	def format_data(self):
 		data = self.load_data()
+<<<<<<< HEAD
 		n = data.shape[0]
 		data.shape = (n // (NUM_NUMBERS + 1000), (NUM_NUMBERS + 1000))
+=======
+>>>>>>> main
 		self.offset = 0 if self.include else 100
 
 		self.boards = data[:,:NUM_NUMBERS]
@@ -95,7 +104,11 @@ class Analyzer:
 		print("Distribution of high digits (25-100) among these boards:")
 		for i, n in enumerate(high_digits_hist):
 			print(f"    {i} high digits: {len(n)} boards")
+<<<<<<< HEAD
 			if i in (0, 3) or len(high_digits_hist[i]) < 10:
+=======
+			if len(high_digits_hist[i]) < 10:
+>>>>>>> main
 				for eb in high_digits_hist[i]:
 					print(" "*8 + str(eb))
 
