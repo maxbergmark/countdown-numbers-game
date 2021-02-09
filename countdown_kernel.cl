@@ -93,6 +93,16 @@ void evaluate_rpn(Tokens tokens, int res[RPN_STACK_SIZE], int *res_n,
 					}
 					val = a / b;
 					break;
+#if INCLUDE_POWER
+				case -5: // power
+					val = pown((float)a, b);
+					if ((a >= 2 && b >= 10) || val < 0 || val > MAX_TARGET) {
+						*res_n = res_i;
+						local_result->extra_stats[POWER_FAIL_INDEX]++;
+						return;
+					}
+					break;
+#endif
 			}
 			stack[stack_i++] = val;
 			if (stack_i == 1) {

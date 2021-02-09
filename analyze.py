@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from sympy import isprime
 from enum import Enum
 import os
+import sys
 
 from configuration import NUM_NUMBERS, MAX_TARGET
 
@@ -27,8 +28,14 @@ class Analyzer:
 		print(f"Total number of boards: {self.boards.shape[0]}")
 
 	def load_data(self):
-		dat_filename = f"./data/output_{NUM_NUMBERS}.dat"
-		csv_filename = f"./data/output_{NUM_NUMBERS}.csv"
+		if len(sys.argv) == 2:
+			csv_filename = sys.argv[1]
+			dat_filename = os.path.splitext(csv_filename)[0] + ".dat"
+		else:
+			Path("./data").mkdir(parents=True, exist_ok=True)
+			csv_filename = f"./data/output_{NUM_NUMBERS}.csv"
+			dat_filename = f"./data/output_{NUM_NUMBERS}.dat"
+
 		if os.path.isfile(dat_filename):
 			data = np.fromfile(dat_filename, dtype=np.int32)
 			n = data.shape[0]

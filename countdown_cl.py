@@ -14,9 +14,7 @@ from data_set import (
 	print_data_set_header, print_data_set_footer)
 from configuration import *
 
-
 KERNEL_NAME = "countdown_kernel.cl"
-
 
 class CountdownGame:
 
@@ -53,6 +51,7 @@ class CountdownGame:
 	@time_function
 	def make_kernel(self):
 		kernel = open(KERNEL_NAME, "r").read()
+		include_power = 1 if POWER_OPERATOR in OPERATORS else 0
 		self.prg = cl.Program(self.ctx, kernel).build(
 			options=[
 				"-D", f"NUM_NUMBERS={NUM_NUMBERS}",
@@ -62,8 +61,10 @@ class CountdownGame:
 				"-D", f"NUM_EXTRA_VALUES={NUM_EXTRA_VALUES}",
 				"-D", f"SUBTRACTION_FAIL_INDEX={SUBTRACTION_FAIL_INDEX}",
 				"-D", f"DIVISION_FAIL_INDEX={DIVISION_FAIL_INDEX}",
+				"-D", f"POWER_FAIL_INDEX={POWER_FAIL_INDEX}",
 				"-D", f"PERMUTATION_FAIL_INDEX={PERMUTATION_FAIL_INDEX}",
-				"-D", f"PERMUTATION_SUCCESS_INDEX={PERMUTATION_SUCCESS_INDEX}"
+				"-D", f"PERMUTATION_SUCCESS_INDEX={PERMUTATION_SUCCESS_INDEX}",
+				"-D", f"INCLUDE_POWER={include_power}"
 			]
 		)
 
@@ -72,13 +73,13 @@ class CountdownGame:
 		if self._operators is None:
 			self._operators = list(map(
 				"".join, 
-				combinations_with_replacement("+-*/", NUM_SYMBOLS)
+				combinations_with_replacement(OPERATORS, NUM_SYMBOLS)
 			))
 		return self._operators
 
 	def map_operators(self, operators):
 		return tuple(map(
-			lambda o: ("+-*/".index(o) + 1) * (-1), 
+			lambda o: (OPERATORS.index(o) + 1) * (-1), 
 			operators
 		))
 
@@ -168,12 +169,15 @@ class CountdownGame:
 
 	def verify_and_save(self):
 		total_permutations = 0
-		target_sums = {2: 516, 3: 62418, 4: 7468178, 
-			5: 927111333, 6: 119547486361}
-		if NUM_NUMBERS not in target_sums:
+		if POWER_OPERATOR in OPERATORS:
+			checksums = {5: 1726774085, 6: 276255154662}
+		else:
+			checksums = {2: 516, 3: 62418, 4: 7468178, 
+				5: 927111333, 6: 119547486361, 7: 15889428184286}
+		if NUM_NUMBERS not in checksums:
 			target_sum = 0
 		else:
-			target_sum = target_sums[NUM_NUMBERS]
+			target_sum = checksums[NUM_NUMBERS]
 	
 		for v in self.output_dict.values():
 			total_permutations += v.sum()
